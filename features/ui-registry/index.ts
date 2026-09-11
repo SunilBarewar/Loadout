@@ -20,6 +20,11 @@ export {
   storedMessagesToUIMessages,
 } from "./mappers/stored-to-ui";
 
+export {
+  assembleChatParts,
+  type ToolResultForAssembly,
+} from "./mappers/assemble-parts";
+
 export type { TextPartData } from "./schemas/text";
 export type { EquipmentPickerPartData } from "./schemas/equipment-picker";
 export type { WorkoutPlanPartData } from "./schemas/workout-plan";

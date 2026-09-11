@@ -429,6 +429,23 @@ export const setLogs = pgTable(
 // 4. Chat Persistence
 // ---------------------------------------------------------------------------
 
+export type ThreadPlanningFacts = {
+  primaryGoal?:
+    | "hypertrophy"
+    | "strength"
+    | "fat_loss"
+    | "endurance"
+    | "general_fitness";
+  experienceLevel?: "beginner" | "intermediate" | "advanced";
+  defaultDaysPerWeek?: number;
+  defaultSessionMinutes?: number;
+  equipmentSlugs?: string[];
+  limitations?: string | null;
+  limitationsConfirmedNone?: boolean;
+  weightUnit?: "kg" | "lb";
+  skipRemainingSlots?: boolean;
+};
+
 export const chatThreads = pgTable("chat_threads", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id")
@@ -442,6 +459,7 @@ export const chatThreads = pgTable("chat_threads", {
     () => workoutSessions.id,
     { onDelete: "set null" }
   ),
+  planningFacts: jsonb("planning_facts").$type<ThreadPlanningFacts>(),
   title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .defaultNow()

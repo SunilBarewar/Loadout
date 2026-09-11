@@ -1,19 +1,39 @@
-import { google } from "@ai-sdk/google";
 import {
-  convertToModelMessages,
   createUIMessageStreamResponse,
-  streamText,
   toUIMessageStream,
   type UIMessage,
 } from "ai";
-import { ensureCurrentUser } from "@/features/users";
+import { ensureCurrentUser, getUserProfileWithEquipment } from "@/features/users";
+import {
+  buildPlanningContext,
+  COACH_MODEL,
+  createCoachStream,
+  detectSkipRemainingSlots,
+} from "@/features/ai";
 import {
   getChatThreadById,
-  insertUserMessage,
+  getThreadMessages,
   insertAssistantMessage,
+  insertUserMessage,
+  mergeThreadPlanningFacts,
+  storedMessagesToUIMessages,
 } from "@/features/planner/repository";
+import { assembleChatParts } from "@/features/ui-registry/mappers/assemble-parts";
 
 export const maxDuration = 30;
+
+function extractLatestUserMessageText(messages: UIMessage[]): string | null {
+  const lastUser = [...messages].reverse().find((message) => message.role === "user");
+  if (!lastUser) return null;
+
+  const text = lastUser.parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("")
+    .trim();
+
+  return text || null;
+}
 
 export async function POST(req: Request) {
   const user = await ensureCurrentUser();
@@ -24,7 +44,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const {
     id: threadId,
-    messages,
+    messages: clientMessages,
   }: {
     id?: string;
     messages: UIMessage[];
@@ -34,43 +54,92 @@ export async function POST(req: Request) {
     return new Response("Missing thread id", { status: 400 });
   }
 
-  // 1. Authorize thread ownership
   const thread = await getChatThreadById(threadId, user.id);
   if (!thread) {
     return new Response("Thread not found or unauthorized", { status: 404 });
   }
 
-  // 2. Persist incoming user message (the last message in the list)
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
-  if (lastUserMessage) {
-    const textPart = lastUserMessage.parts?.find(
-      (p: { type: string; text?: string }) => p.type === "text" && p.text
-    );
-    const content = textPart && "text" in textPart ? (textPart.text as string) : "";
-    if (content) {
-      await insertUserMessage({
-        clientMessageId: lastUserMessage.id,
-        threadId,
-        userId: user.id,
-        content,
-      });
-    }
+  const latestClientUserText = extractLatestUserMessageText(clientMessages);
+  if (latestClientUserText) {
+    const lastUserMessage = [...clientMessages]
+      .reverse()
+      .find((message) => message.role === "user");
+
+    await insertUserMessage({
+      clientMessageId: lastUserMessage?.id,
+      threadId,
+      userId: user.id,
+      content: latestClientUserText,
+    });
   }
 
-  // 3. Stream response with Gemini
-  const result = streamText({
-    model: google("gemini-3.5-flash"),
-    instructions:
-      "You are Loadout, a concise AI workout planner. Answer the user's training questions in clear plain text. Do not generate HTML or JSX.",
-    messages: await convertToModelMessages(messages),
-    onFinish: async ({ text }) => {
-      // 4. Persist assistant response
+  const profileBundle = await getUserProfileWithEquipment(user.id);
+  if (!profileBundle) {
+    return new Response("User profile not found", { status: 404 });
+  }
+
+  const dbMessages = await getThreadMessages(threadId, user.id, 20);
+  const uiMessages = storedMessagesToUIMessages(dbMessages);
+  const latestUserMessage = extractLatestUserMessageText(uiMessages);
+
+  if (
+    latestUserMessage &&
+    detectSkipRemainingSlots(latestUserMessage) &&
+    !thread.planningFacts?.skipRemainingSlots
+  ) {
+    await mergeThreadPlanningFacts(threadId, user.id, {
+      skipRemainingSlots: true,
+    });
+  }
+
+  const refreshedThread = await getChatThreadById(threadId, user.id);
+  const planningContext = buildPlanningContext({
+    purpose: thread.purpose,
+    profile: profileBundle.profile,
+    equipmentSlugs: profileBundle.equipmentSlugs,
+    equipmentCatalog: profileBundle.equipmentCatalog,
+    threadFacts: refreshedThread?.planningFacts ?? thread.planningFacts,
+    latestUserMessage,
+  });
+
+  const result = await createCoachStream({
+    threadId,
+    purpose: thread.purpose,
+    planningContext,
+    messages: uiMessages,
+    onFinish: async (event) => {
+      const text = event.steps
+        .map((step) => step.text)
+        .filter(Boolean)
+        .join("\n\n")
+        .trim();
+
+      const toolResults = event.steps.flatMap((step) =>
+        step.toolResults.map((toolResult) => ({
+          toolName: toolResult.toolName,
+          output: toolResult.output,
+        }))
+      );
+
+      const parts = assembleChatParts({ text, toolResults });
+
+      if (parts.length > 0) {
+        await insertAssistantMessage({
+          threadId,
+          userId: user.id,
+          content: text,
+          model: COACH_MODEL,
+          customParts: parts,
+        });
+        return;
+      }
+
       if (text) {
         await insertAssistantMessage({
           threadId,
           userId: user.id,
           content: text,
-          model: "gemini-3.5-flash",
+          model: COACH_MODEL,
         });
       }
     },

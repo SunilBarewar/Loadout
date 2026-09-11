@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useEffect, useState, useRef} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -70,9 +70,9 @@ export function PlannerChat({
   initialMessages = [],
 }: PlannerChatProps) {
   const router = useRouter();
-  const [input, setInput] = React.useState("");
-  const sentInitialPrompt = React.useRef(false);
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState("");
+  const sentInitialPrompt = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, error, stop } = useChat({
     id: threadId,
@@ -80,16 +80,19 @@ export function PlannerChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
     }),
+    onFinish: () => {
+      router.refresh();
+    },
   });
 
-  React.useEffect(() => {
+ useEffect(() => {
     if (!initialPrompt?.trim() || sentInitialPrompt.current) return;
     sentInitialPrompt.current = true;
     void sendMessage({ text: initialPrompt.trim() });
     router.replace(`/planner/${threadId}`, { scroll: false });
   }, [initialPrompt, router, sendMessage, threadId]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
 

@@ -1,7 +1,13 @@
 import "server-only";
 
 import { db } from "@/db";
-import { chatMessages, chatThreads, type ChatThread, type ChatMessage } from "@/db/schema";
+import {
+  chatMessages,
+  chatThreads,
+  type ChatThread,
+  type ChatMessage,
+  type ThreadPlanningFacts,
+} from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import type { StoredChatPart } from "@/features/ui-registry/schemas/envelope";
 import { storedMessagesToUIMessages } from "@/features/ui-registry/mappers/stored-to-ui";
@@ -225,5 +231,26 @@ export async function insertAssistantMessage(params: {
     .returning();
 
   return message;
+}
+
+export async function mergeThreadPlanningFacts(
+  threadId: string,
+  userId: string,
+  facts: Partial<ThreadPlanningFacts>
+): Promise<ThreadPlanningFacts | null> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return null;
+  }
+
+  const current = (thread.planningFacts as ThreadPlanningFacts | null) ?? {};
+  const merged: ThreadPlanningFacts = { ...current, ...facts };
+
+  await db
+    .update(chatThreads)
+    .set({ planningFacts: merged, updatedAt: new Date() })
+    .where(eq(chatThreads.id, threadId));
+
+  return merged;
 }
 
