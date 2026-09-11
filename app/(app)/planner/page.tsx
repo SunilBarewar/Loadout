@@ -7,6 +7,7 @@ import {
   PlannerPromptInput,
   PromptSuggestions,
   ChatHistoryList,
+  createPlannerThreadAction,
 } from "@/features/planner";
 
 export default function PlannerPage() {
@@ -14,15 +15,18 @@ export default function PlannerPage() {
   const [prompt, setPrompt] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleSubmitPrompt = (submittedPrompt: string) => {
+  const handleSubmitPrompt = async (submittedPrompt: string) => {
     if (!submittedPrompt.trim() || isSubmitting) return;
     setIsSubmitting(true);
 
-    // Redirect to a new conversational chat thread with the submitted prompt
-    const newThreadId = `thread-${Date.now()}`;
-    router.push(
-      `/planner/${newThreadId}?initialPrompt=${encodeURIComponent(submittedPrompt)}`
-    );
+    try {
+      const threadId = await createPlannerThreadAction(submittedPrompt);
+      router.push(
+        `/planner/${threadId}?initialPrompt=${encodeURIComponent(submittedPrompt)}`
+      );
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSelectSuggestion = (selectedPrompt: string) => {

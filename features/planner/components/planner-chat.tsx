@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   ArrowLeft,
   ArrowUp,
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 interface PlannerChatProps {
   threadId: string;
   initialPrompt?: string | null;
+  initialMessages?: UIMessage[];
 }
 
 function messageText(parts: { type: string; text?: string }[]) {
@@ -26,7 +27,11 @@ function messageText(parts: { type: string; text?: string }[]) {
     .join("");
 }
 
-export function PlannerChat({ threadId, initialPrompt }: PlannerChatProps) {
+export function PlannerChat({
+  threadId,
+  initialPrompt,
+  initialMessages = [],
+}: PlannerChatProps) {
   const router = useRouter();
   const [input, setInput] = React.useState("");
   const sentInitialPrompt = React.useRef(false);
@@ -34,6 +39,7 @@ export function PlannerChat({ threadId, initialPrompt }: PlannerChatProps) {
 
   const { messages, sendMessage, status, error, stop } = useChat({
     id: threadId,
+    messages: initialMessages,
     transport: new DefaultChatTransport({
       api: "/api/chat",
     }),

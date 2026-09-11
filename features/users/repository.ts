@@ -1,3 +1,4 @@
+import "server-only";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db, users, type User } from "@/db";

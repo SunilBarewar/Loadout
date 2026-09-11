@@ -57,14 +57,31 @@ interface ChatHistoryListProps {
 }
 
 export function ChatHistoryList({
-  threads = INITIAL_THREADS,
+  threads,
   className,
 }: ChatHistoryListProps) {
+  const [dbThreads, setDbThreads] = React.useState<ChatThreadItem[]>(threads ?? []);
+  const [isLoading, setIsLoading] = React.useState(!threads);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterPurpose, setFilterPurpose] = React.useState<string>("all");
 
+  React.useEffect(() => {
+    if (threads !== undefined) return;
+    import("../actions").then(({ getUserThreadsAction }) => {
+      getUserThreadsAction()
+        .then((items) => {
+          setDbThreads(items);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    });
+  }, [threads]);
+
+  const activeThreads = threads ?? dbThreads;
+
   const filteredThreads = React.useMemo(() => {
-    return threads.filter((thread) => {
+    return activeThreads.filter((thread) => {
       const matchesSearch =
         thread.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         thread.snippet.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -75,7 +92,7 @@ export function ChatHistoryList({
 
       return matchesSearch && matchesFilter;
     });
-  }, [threads, searchQuery, filterPurpose]);
+  }, [activeThreads, searchQuery, filterPurpose]);
 
   return (
     <section className={className}>
