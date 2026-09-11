@@ -22,8 +22,16 @@ export {
 
 export {
   assembleChatParts,
+  findProposedDraft,
   type ToolResultForAssembly,
 } from "./mappers/assemble-parts";
+
+export {
+  buildMessagesSyncKey,
+  hydrateStoredMessages,
+  hydrateStoredParts,
+  type StoredPartsHydrationContext,
+} from "./mappers/hydrate-stored-parts";
 
 export type { TextPartData } from "./schemas/text";
 export type { EquipmentPickerPartData } from "./schemas/equipment-picker";

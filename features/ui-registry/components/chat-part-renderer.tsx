@@ -7,11 +7,12 @@ import type { ChatPartType, StoredChatPart } from "../schemas/envelope";
 
 interface ChatPartRendererProps {
   part: StoredChatPart;
+  threadId?: string;
 }
 
-type RegistryComponent = ComponentType<{ data: unknown }>;
+type RegistryComponent = ComponentType<{ data: unknown; threadId?: string }>;
 
-export function ChatPartRenderer({ part }: ChatPartRendererProps) {
+export function ChatPartRenderer({ part, threadId }: ChatPartRendererProps) {
   const entry = uiRegistry[part.type as ChatPartType];
 
   if (!entry) {
@@ -30,5 +31,5 @@ export function ChatPartRenderer({ part }: ChatPartRendererProps) {
   }
 
   const Component = entry.component as RegistryComponent;
-  return <Component data={parsed.data} />;
+  return <Component data={parsed.data} threadId={threadId} />;
 }

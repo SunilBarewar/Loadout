@@ -1,11 +1,15 @@
 import { redirect, notFound } from "next/navigation";
-import { ensureCurrentUser } from "@/features/users";
+import { ensureCurrentUser, getUserProfileWithEquipment } from "@/features/users";
 import { PlannerChat } from "@/features/planner";
 import {
   getChatThreadById,
   getThreadMessages,
   storedMessagesToUIMessages,
 } from "@/features/planner/repository";
+import {
+  buildMessagesSyncKey,
+  hydrateStoredMessages,
+} from "@/features/ui-registry/mappers/hydrate-stored-parts";
 
 interface PlannerThreadPageProps {
   params: Promise<{ threadId: string }>;
@@ -30,13 +34,22 @@ export default async function PlannerThreadPage({
     notFound();
   }
 
-  // Load existing persisted messages
+  const profileBundle = await getUserProfileWithEquipment(user.id);
+  if (!profileBundle) {
+    notFound();
+  }
+
   const dbMessages = await getThreadMessages(threadId, user.id);
-  const initialMessages = storedMessagesToUIMessages(dbMessages);
+  const hydratedMessages = hydrateStoredMessages(dbMessages, {
+    equipmentCatalog: profileBundle.equipmentCatalog,
+    equipmentSlugs: profileBundle.equipmentSlugs,
+  });
+  const initialMessages = storedMessagesToUIMessages(hydratedMessages);
+  const messagesSyncKey = buildMessagesSyncKey(hydratedMessages);
 
   return (
     <PlannerChat
-      key={threadId}
+      key={`${threadId}-${messagesSyncKey}`}
       threadId={threadId}
       initialPrompt={initialPrompt}
       initialMessages={initialMessages}

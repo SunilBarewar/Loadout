@@ -58,7 +58,7 @@ export function WorkoutPlanCard({ data }: WorkoutPlanCardProps) {
         )}
       </CardContent>
       <CardFooter className="gap-2">
-        <Button render={<Link href={`/plans?planId=${data.planId}`} />} size="sm">
+        <Button render={<Link href={`/plan/${data.planId}`} />} size="sm">
           View plan
         </Button>
         {data.state === "draft" && (

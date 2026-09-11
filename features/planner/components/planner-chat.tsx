@@ -201,6 +201,7 @@ export function PlannerChat({
                       <ChatPartRenderer
                         key={part.id ?? `${message.id}-part-${index}`}
                         part={storedPart}
+                        threadId={threadId}
                       />
                     );
                   })}

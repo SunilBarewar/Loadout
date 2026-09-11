@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import {
   Card,
@@ -33,11 +34,12 @@ export function WeeklyScheduleGrid({ data }: WeeklyScheduleGridProps) {
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2">
           {data.days.map((day) => (
-            <div
+            <Link
               key={day.planDayId}
+              href={`/plan/${data.planId}`}
               className={cn(
                 "rounded-lg border border-border bg-surface-2 p-3 space-y-1",
-                "hover:border-primary/40 transition-colors"
+                "hover:border-primary/40 transition-colors block"
               )}
             >
               <div className="flex items-center justify-between gap-2">
@@ -61,7 +63,7 @@ export function WeeklyScheduleGrid({ data }: WeeklyScheduleGridProps) {
               {day.focus && (
                 <p className="text-xs text-muted-foreground">{day.focus}</p>
               )}
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

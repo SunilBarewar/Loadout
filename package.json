@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:reset": "node --env-file=.env scripts/db-reset.mjs && drizzle-kit migrate"
+    "db:seed:equipment": "node --env-file=.env scripts/seed-equipment.mjs",
+    "db:reset": "node --env-file=.env scripts/db-reset.mjs && drizzle-kit migrate && node --env-file=.env scripts/seed-equipment.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.67",

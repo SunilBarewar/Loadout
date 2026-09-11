@@ -16,11 +16,15 @@ import {
   insertAssistantMessage,
   insertUserMessage,
   mergeThreadPlanningFacts,
+  setThreadRelatedPlanId,
   storedMessagesToUIMessages,
 } from "@/features/planner/repository";
-import { assembleChatParts } from "@/features/ui-registry/mappers/assemble-parts";
+import {
+  assembleChatParts,
+  findProposedDraft,
+} from "@/features/ui-registry/mappers/assemble-parts";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 function extractLatestUserMessageText(messages: UIMessage[]): string | null {
   const lastUser = [...messages].reverse().find((message) => message.role === "user");
@@ -122,6 +126,7 @@ export async function POST(req: Request) {
       );
 
       const parts = assembleChatParts({ text, toolResults });
+      const proposed = findProposedDraft(toolResults);
 
       if (parts.length > 0) {
         await insertAssistantMessage({
@@ -131,16 +136,17 @@ export async function POST(req: Request) {
           model: COACH_MODEL,
           customParts: parts,
         });
-        return;
-      }
-
-      if (text) {
+      } else if (text) {
         await insertAssistantMessage({
           threadId,
           userId: user.id,
           content: text,
           model: COACH_MODEL,
         });
+      }
+
+      if (proposed) {
+        await setThreadRelatedPlanId(threadId, user.id, proposed.planId);
       }
     },
   });

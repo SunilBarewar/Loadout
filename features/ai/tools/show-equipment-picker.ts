@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { StoredChatPart } from "@/features/ui-registry/schemas/envelope";
 import type { Equipment } from "@/db/schema";
 import type { EquipmentPickerPartData } from "@/features/ui-registry/schemas/equipment-picker";
+import { buildEquipmentPickerData } from "@/features/ui-registry/mappers/equipment-picker-data";
 import { getUserProfileWithEquipment } from "@/features/users/repository";
 
 const showEquipmentPickerSchema = z.object({
@@ -13,21 +14,6 @@ export type ShowEquipmentPickerResult = {
   ok: true;
   uiPart: StoredChatPart;
 };
-
-function toPickerCategory(
-  category: string
-): EquipmentPickerPartData["availableEquipment"][number]["category"] {
-  if (
-    category === "free_weight" ||
-    category === "machine" ||
-    category === "bodyweight" ||
-    category === "cardio"
-  ) {
-    return category;
-  }
-
-  return "free_weight";
-}
 
 export function createShowEquipmentPickerTool(params: {
   userId: string;
@@ -42,16 +28,11 @@ export function createShowEquipmentPickerTool(params: {
       const selectedSlugs = profileBundle?.equipmentSlugs ?? [];
       const catalog = profileBundle?.equipmentCatalog ?? params.equipmentCatalog;
 
-      const data: EquipmentPickerPartData = {
+      const data: EquipmentPickerPartData = buildEquipmentPickerData({
         selectionMode,
-        availableEquipment: catalog.map((item) => ({
-          slug: item.slug,
-          name: item.name,
-          category: toPickerCategory(item.category),
-        })),
+        catalog,
         selectedSlugs,
-        allowCustomNotes: true,
-      };
+      });
 
       const uiPart: StoredChatPart = {
         id: crypto.randomUUID(),

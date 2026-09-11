@@ -233,6 +233,22 @@ export async function insertAssistantMessage(params: {
   return message;
 }
 
+export async function setThreadRelatedPlanId(
+  threadId: string,
+  userId: string,
+  planId: string
+): Promise<void> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return;
+  }
+
+  await db
+    .update(chatThreads)
+    .set({ relatedPlanId: planId, updatedAt: new Date() })
+    .where(eq(chatThreads.id, threadId));
+}
+
 export async function mergeThreadPlanningFacts(
   threadId: string,
   userId: string,

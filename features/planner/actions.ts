@@ -1,8 +1,41 @@
 "use server";
 
-import { ensureCurrentUser } from "@/features/users";
-import { createChatThread, listChatThreadsByUser } from "@/features/planner/repository";
+import { ensureCurrentUser, setUserEquipmentSlugs } from "@/features/users";
+import {
+  createChatThread,
+  listChatThreadsByUser,
+  mergeThreadPlanningFacts,
+} from "@/features/planner/repository";
 import type { ChatThreadItem } from "@/features/planner/types";
+
+export type SaveUserEquipmentResult =
+  | { ok: true; slugs: string[] }
+  | { ok: false; error: string };
+
+export async function saveUserEquipmentSelectionAction(
+  threadId: string,
+  equipmentSlugs: string[]
+): Promise<SaveUserEquipmentResult> {
+  const user = await ensureCurrentUser();
+  if (!user) {
+    return { ok: false, error: "You must be signed in to save equipment." };
+  }
+
+  if (equipmentSlugs.length === 0) {
+    return { ok: false, error: "Select at least one piece of equipment." };
+  }
+
+  const validSlugs = await setUserEquipmentSlugs(user.id, equipmentSlugs);
+  if (validSlugs.length === 0) {
+    return { ok: false, error: "None of the selected equipment is in the catalog." };
+  }
+
+  await mergeThreadPlanningFacts(threadId, user.id, {
+    equipmentSlugs: validSlugs,
+  });
+
+  return { ok: true, slugs: validSlugs };
+}
 
 export async function createPlannerThreadAction(initialPrompt?: string): Promise<string> {
   const user = await ensureCurrentUser();
