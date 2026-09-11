@@ -249,6 +249,27 @@ export async function setThreadRelatedPlanId(
     .where(eq(chatThreads.id, threadId));
 }
 
+export async function setThreadPurpose(
+  threadId: string,
+  userId: string,
+  purpose: ChatThread["purpose"],
+  relatedPlanId?: string
+): Promise<void> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return;
+  }
+
+  await db
+    .update(chatThreads)
+    .set({
+      purpose,
+      ...(relatedPlanId ? { relatedPlanId } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(chatThreads.id, threadId));
+}
+
 export async function mergeThreadPlanningFacts(
   threadId: string,
   userId: string,

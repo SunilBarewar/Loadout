@@ -11,12 +11,12 @@ const weekdaySchema = z.union([
 ]);
 
 export const weeklySchedulePartDataSchema = z.object({
-  planId: z.string().uuid(),
-  versionId: z.string().uuid(),
+  planId: z.uuid(),
+  versionId: z.uuid(),
   schedulingMode: z.enum(["fixed_weekdays", "flexible_sequence"]),
   days: z.array(
     z.object({
-      planDayId: z.string().uuid(),
+      planDayId: z.uuid(),
       dayNumber: z.number().int().min(1),
       weekday: weekdaySchema.nullable(),
       title: z.string(),

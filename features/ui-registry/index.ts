@@ -28,6 +28,7 @@ export {
 
 export {
   buildMessagesSyncKey,
+  extractPlanIdsFromMessages,
   hydrateStoredMessages,
   hydrateStoredParts,
   type StoredPartsHydrationContext,

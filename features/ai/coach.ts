@@ -17,7 +17,7 @@ export async function createCoachStream(params: {
   purpose: ChatThread["purpose"];
   planningContext: PlanningContext;
   messages: UIMessage[];
-  onFinish?: Parameters<typeof streamText>[0]["onFinish"];
+  onFinish?: Parameters<typeof streamText>[0]["onEnd"];
 }) {
   const allowedTools = getAllowedCoachTools(params.planningContext);
   const tools = createCoachTools({
@@ -33,6 +33,6 @@ export async function createCoachStream(params: {
     messages: await convertToModelMessages(params.messages),
     tools,
     stopWhen: isStepCount(4),
-    onFinish: params.onFinish,
+    onEnd: params.onFinish,
   });
 }

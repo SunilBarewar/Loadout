@@ -1,7 +1,13 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { CalendarDays, Target } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarDays, CheckCircle2, Target } from "lucide-react";
+import {
+  activatePlanAction,
+  savePlanDraftAction,
+} from "@/features/plans/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +22,7 @@ import type { WorkoutPlanPartData } from "../schemas/workout-plan";
 
 interface WorkoutPlanCardProps {
   data: WorkoutPlanPartData;
+  threadId?: string;
 }
 
 const stateLabels: Record<WorkoutPlanPartData["state"], string> = {
@@ -24,7 +31,47 @@ const stateLabels: Record<WorkoutPlanPartData["state"], string> = {
   active: "Active",
 };
 
-export function WorkoutPlanCard({ data }: WorkoutPlanCardProps) {
+export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSaveDraft() {
+    setError(null);
+    startTransition(async () => {
+      const result = await savePlanDraftAction(
+        data.planId,
+        data.versionId,
+        threadId
+      );
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
+  function handleActivate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await activatePlanAction(
+        data.planId,
+        data.versionId,
+        threadId
+      );
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <Card className="w-full max-w-lg">
       <CardHeader>
@@ -56,14 +103,30 @@ export function WorkoutPlanCard({ data }: WorkoutPlanCardProps) {
             {data.summary}
           </p>
         )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
       <CardFooter className="gap-2">
         <Button render={<Link href={`/plan/${data.planId}`} />} size="sm">
           View plan
         </Button>
         {data.state === "draft" && (
-          <Button variant="outline" size="sm" disabled>
-            Save draft
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={handleSaveDraft}
+          >
+            {isPending ? "Saving…" : "Save draft"}
+          </Button>
+        )}
+        {data.state === "saved" && (
+          <Button
+            size="sm"
+            disabled={isPending}
+            onClick={handleActivate}
+          >
+            <CheckCircle2 className="size-3.5" />
+            {isPending ? "Activating…" : "Activate plan"}
           </Button>
         )}
       </CardFooter>

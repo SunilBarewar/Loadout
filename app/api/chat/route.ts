@@ -19,6 +19,7 @@ import {
   setThreadRelatedPlanId,
   storedMessagesToUIMessages,
 } from "@/features/planner/repository";
+import { getPlanSummaryForContext } from "@/features/plans/repository";
 import {
   assembleChatParts,
   findProposedDraft,
@@ -97,8 +98,17 @@ export async function POST(req: Request) {
   }
 
   const refreshedThread = await getChatThreadById(threadId, user.id);
+  const relatedPlanId =
+    refreshedThread?.relatedPlanId ?? thread.relatedPlanId ?? null;
+  const activePlanSummary =
+    relatedPlanId
+      ? await getPlanSummaryForContext(relatedPlanId, user.id)
+      : null;
+
   const planningContext = buildPlanningContext({
     purpose: thread.purpose,
+    relatedPlanId,
+    activePlanSummary,
     profile: profileBundle.profile,
     equipmentSlugs: profileBundle.equipmentSlugs,
     equipmentCatalog: profileBundle.equipmentCatalog,
@@ -124,7 +134,7 @@ export async function POST(req: Request) {
           output: toolResult.output,
         }))
       );
-
+      console.log("toolResults", JSON.stringify(toolResults, null, 2));
       const parts = assembleChatParts({ text, toolResults });
       const proposed = findProposedDraft(toolResults);
 

@@ -6,8 +6,10 @@ import {
   getThreadMessages,
   storedMessagesToUIMessages,
 } from "@/features/planner/repository";
+import { getPlanStatusesForUser } from "@/features/plans";
 import {
   buildMessagesSyncKey,
+  extractPlanIdsFromMessages,
   hydrateStoredMessages,
 } from "@/features/ui-registry/mappers/hydrate-stored-parts";
 
@@ -40,9 +42,12 @@ export default async function PlannerThreadPage({
   }
 
   const dbMessages = await getThreadMessages(threadId, user.id);
+  const planIds = extractPlanIdsFromMessages(dbMessages);
+  const planStates = await getPlanStatusesForUser(user.id, planIds);
   const hydratedMessages = hydrateStoredMessages(dbMessages, {
     equipmentCatalog: profileBundle.equipmentCatalog,
     equipmentSlugs: profileBundle.equipmentSlugs,
+    planStates,
   });
   const initialMessages = storedMessagesToUIMessages(hydratedMessages);
   const messagesSyncKey = buildMessagesSyncKey(hydratedMessages);

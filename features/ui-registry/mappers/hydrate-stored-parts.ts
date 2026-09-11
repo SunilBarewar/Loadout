@@ -1,5 +1,7 @@
 import type { ChatMessage, Equipment } from "@/db/schema";
+import type { PlanCardState } from "@/features/plans/schemas";
 import type { EquipmentPickerPartData } from "../schemas/equipment-picker";
+import type { WorkoutPlanPartData } from "../schemas/workout-plan";
 import {
   parseChatParts,
   type StoredChatPart,
@@ -9,6 +11,7 @@ import { buildEquipmentPickerData } from "./equipment-picker-data";
 export type StoredPartsHydrationContext = {
   equipmentCatalog: Equipment[];
   equipmentSlugs: string[];
+  planStates?: Map<string, PlanCardState>;
 };
 
 function hydrateEquipmentPickerPart(
@@ -28,6 +31,40 @@ function hydrateEquipmentPickerPart(
   };
 }
 
+function hydrateWorkoutPlanPart(
+  part: Extract<StoredChatPart, { type: "workout_plan" }>,
+  context: StoredPartsHydrationContext
+): Extract<StoredChatPart, { type: "workout_plan" }> {
+  const existing = part.data as WorkoutPlanPartData;
+  const liveState = context.planStates?.get(existing.planId);
+
+  if (!liveState || liveState === existing.state) {
+    return part;
+  }
+
+  return {
+    ...part,
+    data: {
+      ...existing,
+      state: liveState,
+    },
+  };
+}
+
+export function extractPlanIdsFromMessages(messages: ChatMessage[]): string[] {
+  const planIds = new Set<string>();
+
+  for (const message of messages) {
+    for (const part of parseChatParts(message.parts)) {
+      if (part.type === "workout_plan") {
+        planIds.add(part.data.planId);
+      }
+    }
+  }
+
+  return [...planIds];
+}
+
 export function hydrateStoredParts(
   parts: unknown,
   context: StoredPartsHydrationContext
@@ -35,6 +72,10 @@ export function hydrateStoredParts(
   return parseChatParts(parts).map((part) => {
     if (part.type === "equipment_picker") {
       return hydrateEquipmentPickerPart(part, context);
+    }
+
+    if (part.type === "workout_plan") {
+      return hydrateWorkoutPlanPart(part, context);
     }
 
     return part;

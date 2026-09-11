@@ -138,3 +138,19 @@ export type InsertedDraftPlan = {
 export type ProposeWorkoutPlanResult =
   | ({ ok: true } & InsertedDraftPlan)
   | { ok: false; error: string };
+
+export const reviseWorkoutPlanSchema = proposeWorkoutPlanSchema.extend({
+  changeSummary: z.string().min(1).max(300),
+});
+
+export type ReviseWorkoutPlanInput = z.infer<typeof reviseWorkoutPlanSchema>;
+
+export type PlanCardState = "draft" | "saved" | "active";
+
+export type InsertedPlanRevision = Omit<InsertedDraftPlan, "state"> & {
+  state: PlanCardState;
+};
+
+export type ReviseWorkoutPlanResult =
+  | ({ ok: true } & InsertedPlanRevision)
+  | { ok: false; error: string };
