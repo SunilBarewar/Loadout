@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
+import { ChatPartRenderer } from "@/features/ui-registry";
+import type { StoredChatPart } from "@/features/ui-registry";
 import { cn } from "@/lib/utils";
 
 interface PlannerChatProps {
@@ -20,11 +22,46 @@ interface PlannerChatProps {
   initialMessages?: UIMessage[];
 }
 
-function messageText(parts: { type: string; text?: string }[]) {
+function messageText(parts: UIMessage["parts"]) {
   return parts
-    .filter((part) => part.type === "text" && part.text)
-    .map((part) => part.text)
+    .filter(
+      (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
+        part.type === "text"
+    )
+    .map((part) => part.text ?? "")
     .join("");
+}
+
+function isDataRegistryPart(
+  part: UIMessage["parts"][number]
+): part is UIMessage["parts"][number] & { type: `data-${string}`; data: unknown; id?: string } {
+  return part.type.startsWith("data-");
+}
+
+function dataPartToStoredPart(
+  part: UIMessage["parts"][number] & { type: `data-${string}`; data: unknown; id?: string }
+): StoredChatPart | null {
+  const registryType = part.type.replace(/^data-/, "");
+  if (
+    registryType !== "equipment_picker" &&
+    registryType !== "workout_plan" &&
+    registryType !== "weekly_schedule"
+  ) {
+    return null;
+  }
+
+  return {
+    id: part.id ?? crypto.randomUUID(),
+    type: registryType,
+    schemaVersion: 1,
+    data: part.data,
+  } as StoredChatPart;
+}
+
+function hasRenderableContent(parts: UIMessage["parts"]) {
+  const text = messageText(parts);
+  if (text) return true;
+  return parts.some(isDataRegistryPart);
 }
 
 export function PlannerChat({
@@ -113,7 +150,11 @@ export function PlannerChat({
         {messages.map((message) => {
           const isUser = message.role === "user";
           const text = messageText(message.parts);
-          if (!text && message.role !== "assistant") return null;
+          const dataParts = message.parts.filter(isDataRegistryPart);
+
+          if (!hasRenderableContent(message.parts) && message.role !== "assistant") {
+            return null;
+          }
 
           return (
             <div
@@ -134,15 +175,32 @@ export function PlannerChat({
                 </span>
               </div>
 
-              <div
-                className={cn(
-                  "p-4 rounded-md text-sm leading-relaxed border whitespace-pre-wrap",
-                  isUser
-                    ? "bg-primary text-primary-foreground border-primary font-medium shadow-xs"
-                    : "bg-card text-foreground border-border"
+              <div className="flex flex-col gap-3 w-full">
+                {(text || (message.role === "assistant" && isBusy && !dataParts.length)) && (
+                  <div
+                    className={cn(
+                      "p-4 rounded-md text-sm leading-relaxed border whitespace-pre-wrap",
+                      isUser
+                        ? "bg-primary text-primary-foreground border-primary font-medium shadow-xs"
+                        : "bg-card text-foreground border-border"
+                    )}
+                  >
+                    {text || (status === "streaming" ? "…" : "")}
+                  </div>
                 )}
-              >
-                {text || (status === "streaming" ? "…" : "")}
+
+                {!isUser &&
+                  dataParts.map((part, index) => {
+                    const storedPart = dataPartToStoredPart(part);
+                    if (!storedPart) return null;
+
+                    return (
+                      <ChatPartRenderer
+                        key={part.id ?? `${message.id}-part-${index}`}
+                        part={storedPart}
+                      />
+                    );
+                  })}
               </div>
             </div>
           );

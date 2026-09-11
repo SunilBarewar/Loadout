@@ -3,14 +3,11 @@ import "server-only";
 import { db } from "@/db";
 import { chatMessages, chatThreads, type ChatThread, type ChatMessage } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
-import type { UIMessage } from "ai";
+import type { StoredChatPart } from "@/features/ui-registry/schemas/envelope";
+import { storedMessagesToUIMessages } from "@/features/ui-registry/mappers/stored-to-ui";
 
-export type StoredChatPart = {
-  id: string;
-  type: string;
-  schemaVersion: 1;
-  data: Record<string, unknown>;
-};
+export type { StoredChatPart };
+export { storedMessagesToUIMessages };
 
 export async function createChatThread(params: {
   userId: string;
@@ -71,9 +68,9 @@ export async function listChatThreadsByUser(
       let snippet: string | undefined;
       if (messages.length > 0) {
         const parts = messages[0].parts as StoredChatPart[];
-        const textPart = parts.find((p) => p.type === "text" && typeof p.data?.content === "string");
+        const textPart = parts.find((p) => p.type === "text");
         if (textPart) {
-          snippet = textPart.data.content as string;
+          snippet = textPart.data.content;
         }
       }
 
@@ -168,7 +165,9 @@ export async function insertUserMessage(params: {
     const existing = recentMessages.find((message) => {
       const storedParts = message.parts as StoredChatPart[];
       return storedParts.some(
-        (part) => part.data?.clientMessageId === params.clientMessageId
+        (part) =>
+          part.type === "text" &&
+          part.data.clientMessageId === params.clientMessageId
       );
     });
 
@@ -228,27 +227,3 @@ export async function insertAssistantMessage(params: {
   return message;
 }
 
-export function storedMessagesToUIMessages(messages: ChatMessage[]): UIMessage[] {
-  return messages.map((m) => {
-    const rawParts = (m.parts as StoredChatPart[]) || [];
-    const uiParts = rawParts.map((p) => {
-      if (p.type === "text") {
-        return {
-          type: "text" as const,
-          text: (p.data?.content as string) || "",
-        };
-      }
-      return {
-        type: "text" as const,
-        text: "",
-      };
-    });
-
-    return {
-      id: m.id,
-      role: m.role as "user" | "assistant" | "system",
-      parts: uiParts,
-      createdAt: m.createdAt,
-    };
-  });
-}
