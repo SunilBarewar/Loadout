@@ -97,7 +97,7 @@ export function AppSidebar() {
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
                         isActive
-                          ? "bg-primary text-primary-foreground font-semibold hover:bg-primary hover:text-primary-foreground shadow-xs"
+                          ? "bg-primary! text-primary-foreground! font-semibold hover:bg-primary/50! hover:text-primary-foreground! shadow-xs"
                           : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
                       )}
                     >
@@ -132,7 +132,7 @@ export function AppSidebar() {
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
                         isActive
-                          ? "bg-primary text-primary-foreground font-semibold hover:bg-primary hover:text-primary-foreground shadow-xs"
+                          ? "bg-primary! text-primary-foreground! font-semibold hover:bg-primary! hover:text-primary-foreground! shadow-xs"
                           : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
                       )}
                     >
