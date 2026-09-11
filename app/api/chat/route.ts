@@ -6,10 +6,16 @@ import {
   toUIMessageStream,
   type UIMessage,
 } from "ai";
+import { ensureCurrentUser } from "@/features/users";
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
+  const user = await ensureCurrentUser();
+  if (!user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({

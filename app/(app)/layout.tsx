@@ -5,12 +5,14 @@ import { DesktopTopBar } from "@/components/desktop-top-bar";
 import { MobileTopBar } from "@/components/mobile-top-bar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { CompactSessionHeader } from "@/components/compact-session-header";
+import { ensureCurrentUser } from "@/features/users";
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await ensureCurrentUser();
   return (
     <SidebarProvider
       style={
