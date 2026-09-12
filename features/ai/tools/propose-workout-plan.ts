@@ -16,7 +16,7 @@ export function createProposeWorkoutPlanTool(params: {
 }) {
   return tool({
     description:
-      "Compile a complete weekly workout program into a draft plan. Call only when the user wants a plan and planning context is complete (allowPropose is true). Supply the full domain program (title, days, exercises). Never invent planId or other database IDs — the server inserts rows and returns IDs. Match equipment to the user's available slugs, daysPerWeek and session length to context, and respect limitations. Do not put JSON in the user-visible reply.",
+      "Compile a complete weekly workout program into a draft plan. Call only when the user wants a plan and planning context is complete (allowPropose is true). Supply the full domain program (title, days, exercises). Never invent planId or other database IDs — the server inserts rows and returns IDs. Match equipment to the user's available slugs, daysPerWeek and session length to context, and respect limitations. For fixed_weekdays, set weekday using JavaScript convention: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday (Monday is 1). Do not put JSON in the user-visible reply.",
     inputSchema: proposeWorkoutPlanSchema,
     execute: async (input): Promise<ProposeWorkoutPlanResult> => {
       if (!params.planningContext.allowPropose) {

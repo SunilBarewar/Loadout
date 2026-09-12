@@ -19,6 +19,13 @@ export {
 } from "./actions";
 
 export {
+  WEEKDAY_LABELS,
+  WEEKDAY_LABELS_SHORT,
+  WEEKDAY_FIELD_DESCRIPTION,
+  type Weekday,
+} from "./weekdays";
+
+export {
   proposeWorkoutPlanSchema,
   reviseWorkoutPlanSchema,
   type ProposeWorkoutPlanInput,

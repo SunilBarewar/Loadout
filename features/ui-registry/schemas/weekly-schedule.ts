@@ -1,14 +1,5 @@
 import { z } from "zod";
-
-const weekdaySchema = z.union([
-  z.literal(0),
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-  z.literal(5),
-  z.literal(6),
-]);
+import { weekdaySchema } from "@/features/plans/schemas";
 
 export const weeklySchedulePartDataSchema = z.object({
   planId: z.uuid(),

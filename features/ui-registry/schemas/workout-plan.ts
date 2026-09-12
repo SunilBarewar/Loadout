@@ -9,6 +9,7 @@ export const workoutPlanPartDataSchema = z.object({
   daysPerWeek: z.number().int().min(1).max(7),
   estimatedWeeklyMinutes: z.number().int().nullable(),
   summary: z.string().nullable(),
+  isRevision: z.boolean().optional(),
 });
 
 export type WorkoutPlanPartData = z.infer<typeof workoutPlanPartDataSchema>;

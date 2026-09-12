@@ -103,6 +103,12 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
             {data.summary}
           </p>
         )}
+        {data.state === "draft" && data.isRevision && (
+          <p className="text-sm text-muted-foreground">
+            Review the updated schedule below, then save this revision to keep
+            the changes.
+          </p>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
       <CardFooter className="gap-2">
@@ -116,7 +122,11 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
             disabled={isPending}
             onClick={handleSaveDraft}
           >
-            {isPending ? "Saving…" : "Save draft"}
+            {isPending
+              ? "Saving…"
+              : data.isRevision
+                ? "Save revision"
+                : "Save draft"}
           </Button>
         )}
         {data.state === "saved" && (

@@ -4,8 +4,7 @@ import { ArrowLeft, Clock, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ensureCurrentUser } from "@/features/users";
 import { getPlanWithVersion } from "@/features/plans";
-
-const weekdayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+import { WEEKDAY_LABELS } from "@/features/plans/weekdays";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -73,9 +72,11 @@ export default async function PlanDetailPage({
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-primary">
-                  {day.scheduledWeekday != null
-                    ? weekdayLabels[day.scheduledWeekday]
-                    : `Day ${day.dayNumber}`}
+                 
+                Day {day.dayNumber}
+                {day.scheduledWeekday != null
+                  ? ` · ${WEEKDAY_LABELS[day.scheduledWeekday]}`
+                  : null}
                 </p>
                 <h2 className="font-display font-bold text-xl text-foreground">
                   {day.title}

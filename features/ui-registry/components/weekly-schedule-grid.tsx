@@ -10,13 +10,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { WEEKDAY_LABELS_SHORT } from "@/features/plans/weekdays";
 import type { WeeklySchedulePartData } from "../schemas/weekly-schedule";
 
 interface WeeklyScheduleGridProps {
   data: WeeklySchedulePartData;
 }
-
-const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function WeeklyScheduleGrid({ data }: WeeklyScheduleGridProps) {
   const isFlexible = data.schedulingMode === "flexible_sequence";
@@ -47,7 +46,7 @@ export function WeeklyScheduleGrid({ data }: WeeklyScheduleGridProps) {
                   {isFlexible
                     ? `Day ${day.dayNumber}`
                     : day.weekday != null
-                      ? weekdayLabels[day.weekday]
+                      ? WEEKDAY_LABELS_SHORT[day.weekday]
                       : `Day ${day.dayNumber}`}
                 </span>
                 {day.estimatedMinutes != null && (

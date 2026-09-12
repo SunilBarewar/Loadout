@@ -18,7 +18,7 @@ export function createReviseWorkoutPlanTool(params: {
 
   return tool({
     description:
-      "Revise an existing workout plan by creating a new plan version. Call when the user wants to change their current program (days, exercises, duration, equipment, etc.). Supply the full updated program plus a short changeSummary. Never invent planId — use the related plan from planning context. Match equipment to available slugs and respect limitations.",
+      "Revise an existing workout plan by creating a new plan version. Call when the user wants to change their current program (days, exercises, duration, equipment, etc.). Supply the full updated program plus a short changeSummary. Never invent planId — use the related plan from planning context. Match equipment to available slugs and respect limitations. For fixed_weekdays, set weekday using JavaScript convention: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday (Monday is 1). The user must tap Save revision on the plan card to keep changes.",
     inputSchema: reviseWorkoutPlanSchema,
     execute: async (input): Promise<ReviseWorkoutPlanResult> => {
       if (!planId) {

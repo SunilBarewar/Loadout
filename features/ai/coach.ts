@@ -1,4 +1,4 @@
-import { google } from "@ai-sdk/google";
+import { openai } from '@ai-sdk/openai';
 import {
   convertToModelMessages,
   isStepCount,
@@ -28,7 +28,7 @@ export async function createCoachStream(params: {
   });
 
   return streamText({
-    model: google(COACH_MODEL),
+    model: openai('gpt-4.1'),
     instructions: buildCoachInstructions(params.purpose, params.planningContext),
     messages: await convertToModelMessages(params.messages),
     tools,

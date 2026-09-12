@@ -3,8 +3,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Next.js Premium Startup Boilerplate",
-  description: "Created using the ultimate interactive Next.js stack generator CLI.",
+  title: "Loadout - AI Coach for Workouts",
+  description: "Loadout is an AI coach for workouts. It helps you create personalized workout plans based on your goals and fitness level.",
 };
 
 const isClerkConfigured = 

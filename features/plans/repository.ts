@@ -442,9 +442,9 @@ export async function insertPlanRevision(params: {
     catalogSlugs,
   });
 
-  // Draft revisions become the working version immediately. Saved/active plans
-  // keep activeVersionId until the user explicitly saves the revision.
-  const shouldPromoteVersion = plan.status === "draft";
+  // Always point at the new version so plan views and cards stay in sync.
+  // Saved/active plans revert to draft until the user saves the revision.
+  const wasCommitted = plan.status === "saved" || plan.status === "active";
 
   await db
     .update(workoutPlans)
@@ -452,7 +452,8 @@ export async function insertPlanRevision(params: {
       title: params.domain.title,
       goal: params.domain.goal,
       daysPerWeek: params.domain.daysPerWeek,
-      ...(shouldPromoteVersion ? { activeVersionId: version.id } : {}),
+      activeVersionId: version.id,
+      ...(wasCommitted ? { status: "draft" } : {}),
       updatedAt: new Date(),
     })
     .where(eq(workoutPlans.id, plan.id));
@@ -460,7 +461,7 @@ export async function insertPlanRevision(params: {
   return {
     planId: plan.id,
     versionId: version.id,
-    state: planStatusToCardState(plan.status),
+    state: wasCommitted ? "draft" : planStatusToCardState(plan.status),
     title: params.domain.title,
     goal: params.domain.goal,
     daysPerWeek: params.domain.daysPerWeek,

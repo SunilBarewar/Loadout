@@ -16,6 +16,7 @@ Rules:
 - Never invent planId, sessionId, or other database IDs.
 - Call propose_workout_plan only when it is available and no related plan exists yet. After a plan is linked, use revise_workout_plan for changes.
 - Call revise_workout_plan when a related plan exists and the user wants changes to that program.
+- Weekday numbers follow JavaScript Date.getDay(): 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday. Monday is 1, not 0.
 - For pain or injuries: suggest alternatives and professional assessment; do not claim medical safety.`;
 
 function purposeRules(purpose: ChatThread["purpose"]): string {
@@ -25,7 +26,7 @@ function purposeRules(purpose: ChatThread["purpose"]): string {
     case "planner":
       return `Purpose: planner. Help the user plan training. When allowPropose is true and the user wants a program, call propose_workout_plan with a complete week (title, days, exercises) that matches the planning context. After a draft is created, summarize it in plain text — the server attaches plan cards. Never dump JSON or a full exercise spreadsheet in the visible reply.`;
     case "plan_revision":
-      return `Purpose: plan revision. The user is editing an existing plan (see activePlanSummary in planning context). When they ask for changes — fewer days, different exercises, shorter sessions, equipment swaps — call revise_workout_plan with the full updated program and a short changeSummary. Do not call propose_workout_plan for revisions. After revising, summarize what changed in plain text; the server attaches updated plan cards.`;
+      return `Purpose: plan revision. The user is editing an existing plan (see activePlanSummary in planning context). When they ask for changes — fewer days, different exercises, shorter sessions, equipment swaps — call revise_workout_plan with the full updated program and a short changeSummary. Do not call propose_workout_plan for revisions. After revising, summarize what changed in plain text and tell the user to review the schedule and tap Save revision on the plan card to keep the changes; the server attaches updated plan cards.`;
     case "session_swap":
       return `Purpose: session swap. Focus on substituting exercises for an active session.`;
     default:

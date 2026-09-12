@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WEEKDAY_FIELD_DESCRIPTION } from "./weekdays";
 
 export const trainingGoalSchema = z.enum([
   "hypertrophy",
@@ -13,15 +14,17 @@ export const schedulingModeSchema = z.enum([
   "flexible_sequence",
 ]);
 
-export const weekdaySchema = z.union([
-  z.literal(0),
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-  z.literal(5),
-  z.literal(6),
-]);
+export const weekdaySchema = z
+  .union([
+    z.literal(0),
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+    z.literal(6),
+  ])
+  .describe(WEEKDAY_FIELD_DESCRIPTION);
 
 export const proposePlanExerciseSchema = z.object({
   position: z.number().int().min(1),
@@ -40,7 +43,11 @@ export const proposePlanExerciseSchema = z.object({
 
 export const proposePlanDaySchema = z.object({
   dayNumber: z.number().int().min(1).max(7),
-  weekday: weekdaySchema.nullable(),
+  weekday: weekdaySchema
+    .nullable()
+    .describe(
+      `Required when schedulingMode is fixed_weekdays. ${WEEKDAY_FIELD_DESCRIPTION}`
+    ),
   title: z.string().min(1).max(80),
   focus: z.string().max(120).nullable(),
   estimatedMinutes: z.number().int().min(10).max(240),

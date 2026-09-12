@@ -18,7 +18,10 @@ function isPlanToolSuccess(output: unknown): output is PlanToolSuccess {
   return value.ok === true && typeof value.planId === "string";
 }
 
-function buildPlanCardParts(draft: PlanToolSuccess): StoredChatPart[] {
+function buildPlanCardParts(
+  draft: PlanToolSuccess,
+  options?: { isRevision?: boolean }
+): StoredChatPart[] {
   return [
     {
       id: crypto.randomUUID(),
@@ -33,6 +36,7 @@ function buildPlanCardParts(draft: PlanToolSuccess): StoredChatPart[] {
         daysPerWeek: draft.daysPerWeek,
         estimatedWeeklyMinutes: draft.estimatedWeeklyMinutes,
         summary: draft.summary,
+        isRevision: options?.isRevision ?? false,
       },
     },
     {
@@ -88,11 +92,17 @@ export function assembleChatParts(params: {
     }
 
     if (
-      (result.toolName === "propose_workout_plan" ||
-        result.toolName === "revise_workout_plan") &&
+      result.toolName === "propose_workout_plan" &&
       isPlanToolSuccess(result.output)
     ) {
       parts.push(...buildPlanCardParts(result.output));
+    }
+
+    if (
+      result.toolName === "revise_workout_plan" &&
+      isPlanToolSuccess(result.output)
+    ) {
+      parts.push(...buildPlanCardParts(result.output, { isRevision: true }));
     }
   }
 
