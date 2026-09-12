@@ -6,11 +6,16 @@ export {
   insertDraftPlan,
   insertPlanRevision,
   getPlanWithVersion,
+  listPlansForUser,
   PlanCompilerError,
   savePlanDraft,
+  type PlanListItem,
   type PlanSummaryForContext,
   type PlanWithVersion,
 } from "./repository";
+
+export { getPlansPageData } from "./get-plans-page-data";
+export { mapPlanListItem } from "./formatters";
 
 export {
   inferSchedulingMode,
@@ -43,4 +48,6 @@ export {
   type InsertedDraftPlan,
   type InsertedPlanRevision,
   type PlanCardState,
+  type PlanListItemView,
+  type PlansPageData,
 } from "./schemas";

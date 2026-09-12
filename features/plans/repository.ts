@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
   db,
   equipment,
@@ -566,6 +566,81 @@ export async function getPlanSummaryForContext(
     daysPerWeek: loaded.plan.daysPerWeek,
     goal: loaded.plan.goal,
   };
+}
+
+export type PlanListItem = {
+  planId: string;
+  versionId: string;
+  title: string;
+  goal: WorkoutPlan["goal"];
+  daysPerWeek: number;
+  state: PlanCardState;
+  estimatedWeeklyMinutes: number | null;
+  summary: string | null;
+  versionNumber: number;
+  updatedAt: Date;
+};
+
+function buildPlanSummary(
+  days: Array<{ focus: string | null }>,
+  changeSummary: string | null
+): string | null {
+  if (changeSummary?.trim()) {
+    return changeSummary.trim();
+  }
+
+  const focuses = days
+    .map((day) => day.focus?.trim())
+    .filter((focus): focus is string => Boolean(focus));
+
+  if (focuses.length === 0) {
+    return null;
+  }
+
+  return focuses.slice(0, 3).join(" · ");
+}
+
+export async function listPlansForUser(userId: string): Promise<PlanListItem[]> {
+  const plans = await db
+    .select()
+    .from(workoutPlans)
+    .where(
+      and(eq(workoutPlans.userId, userId), ne(workoutPlans.status, "archived"))
+    )
+    .orderBy(
+      desc(sql`CASE WHEN ${workoutPlans.status} = 'active' THEN 1 ELSE 0 END`),
+      desc(workoutPlans.updatedAt)
+    );
+
+  const items: PlanListItem[] = [];
+
+  for (const plan of plans) {
+    const loaded = await getPlanWithVersion(plan.id, userId);
+    if (!loaded) {
+      continue;
+    }
+
+    const estimatedWeeklyMinutes = loaded.days.reduce(
+      (total, day) => total + (day.estimatedMinutes ?? 0),
+      0
+    );
+
+    items.push({
+      planId: plan.id,
+      versionId: loaded.version.id,
+      title: plan.title,
+      goal: plan.goal,
+      daysPerWeek: plan.daysPerWeek,
+      state: planStatusToCardState(plan.status),
+      estimatedWeeklyMinutes:
+        estimatedWeeklyMinutes > 0 ? estimatedWeeklyMinutes : null,
+      summary: buildPlanSummary(loaded.days, loaded.version.changeSummary),
+      versionNumber: loaded.version.versionNumber,
+      updatedAt: plan.updatedAt,
+    });
+  }
+
+  return items;
 }
 
 export async function getActivePlanForUser(

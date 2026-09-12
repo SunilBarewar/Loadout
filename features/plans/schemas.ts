@@ -161,3 +161,20 @@ export type InsertedPlanRevision = Omit<InsertedDraftPlan, "state"> & {
 export type ReviseWorkoutPlanResult =
   | ({ ok: true } & InsertedPlanRevision)
   | { ok: false; error: string };
+
+export type PlanListItemView = {
+  planId: string;
+  versionId: string;
+  title: string;
+  goalLabel: string | null;
+  daysPerWeek: number;
+  state: PlanCardState;
+  estimatedWeeklyMinutes: number | null;
+  summary: string | null;
+  metaLabel: string;
+};
+
+export type PlansPageData = {
+  activePlan: PlanListItemView | null;
+  otherPlans: PlanListItemView[];
+};
