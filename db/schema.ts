@@ -307,6 +307,7 @@ export const workoutSessions = pgTable(
     sourcePlanDayId: uuid("source_plan_day_id").references(() => planDays.id, {
       onDelete: "set null",
     }),
+    scheduledWeekdaySnapshot: smallint("scheduled_weekday_snapshot"),
     titleSnapshot: text("title_snapshot").notNull(),
     status: sessionStatusEnum("status").default("active").notNull(),
     currentExercisePosition: integer("current_exercise_position")
@@ -337,6 +338,10 @@ export const workoutSessions = pgTable(
     uniqueIndex("workout_sessions_user_active_paused_idx")
       .on(table.userId)
       .where(sql`${table.status} IN ('active', 'paused')`),
+    check(
+      "workout_sessions_scheduled_weekday_snapshot_check",
+      sql`${table.scheduledWeekdaySnapshot} IS NULL OR (${table.scheduledWeekdaySnapshot} >= 0 AND ${table.scheduledWeekdaySnapshot} <= 6)`
+    ),
   ]
 );
 
@@ -365,6 +370,7 @@ export const sessionExercises = pgTable(
     weightUnitSnapshot: weightUnitEnum("weight_unit_snapshot"),
     restSecondsSnapshot: integer("rest_seconds_snapshot").notNull(),
     status: sessionExerciseStatusEnum("status").default("pending").notNull(),
+    notes: text("notes"),
     replacementReason: text("replacement_reason"),
     replacesSessionExerciseId: uuid("replaces_session_exercise_id"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
@@ -402,6 +408,7 @@ export const setLogs = pgTable(
     weightUnit: weightUnitEnum("weight_unit"),
     rpe: numeric("rpe", { precision: 3, scale: 1 }),
     status: setStatusEnum("status").default("completed").notNull(),
+    notes: text("notes"),
     completedAt: timestamp("completed_at", {
       withTimezone: true,
       mode: "date",

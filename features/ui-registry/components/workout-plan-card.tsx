@@ -112,7 +112,11 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
       <CardFooter className="gap-2">
-        <Button render={<Link href={`/plan/${data.planId}`} />} size="sm">
+        <Button
+          nativeButton={false}
+          render={<Link href={`/plan/${data.planId}`} />}
+          size="sm"
+        >
           View plan
         </Button>
         {data.state === "draft" && (

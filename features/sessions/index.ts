@@ -1,6 +1,7 @@
 export {
   getActiveSessionForUser,
   getCompletedSessionForPlanDayToday,
+  getSessionForUserToday,
   getCompletedSessionsForWeek,
   getLastCompletedSessionForPlanInRange,
   getSessionById,
@@ -13,6 +14,11 @@ export {
   resumeSession,
   endSession,
   logSet,
+  finishExerciseEarly,
+  skipExercise,
+  replaceExercise,
+  setCurrentExercise,
+  reorderSessionExercises,
 } from "./repository";
 
 export {
@@ -21,6 +27,11 @@ export {
   resumeSessionAction,
   endSessionAction,
   logSetAction,
+  finishExerciseEarlyAction,
+  skipExerciseAction,
+  replaceExerciseAction,
+  setCurrentExerciseAction,
+  reorderSessionExercisesAction,
   type StartSessionResult,
   type SessionMutationResult,
   type LogSetActionResult,
@@ -35,6 +46,7 @@ export {
   formatLoggedSetLabel,
   formatSessionDuration,
   formatTargetLabel,
+  countTerminalSets,
   toActiveSessionHeaderData,
 } from "./formatters";
 

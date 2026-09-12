@@ -22,9 +22,10 @@ export type LogSetInput = {
   sessionId: string;
   sessionExerciseId: string;
   setNumber: number;
-  performedReps: number;
+  performedReps?: number | null;
   performedLoad?: string | null;
   rpe?: string | null;
+  notes?: string | null;
   status?: "completed" | "failed" | "skipped";
 };
 
@@ -75,6 +76,9 @@ export type SerializedExercise = {
   weightUnitSnapshot: "kg" | "lb" | null;
   restSecondsSnapshot: number;
   status: "pending" | "in_progress" | "completed" | "skipped" | "replaced";
+  notes: string | null;
+  replacementReason: string | null;
+  replacesSessionExerciseId: string | null;
 };
 
 export type SerializedSetLog = {
@@ -85,6 +89,7 @@ export type SerializedSetLog = {
   performedLoad: string | null;
   weightUnit: "kg" | "lb" | null;
   status: "completed" | "failed" | "skipped";
+  notes: string | null;
   completedAt: string | null;
 };
 

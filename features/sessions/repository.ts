@@ -19,10 +19,14 @@ import {
   type PlanExercise,
   type PlanVersion,
   type SessionExercise,
+  type SetStatus,
   type WeightUnit,
   type WorkoutPlan,
   type WorkoutSession,
 } from "@/db";
+
+const TERMINAL_SET_STATUSES: SetStatus[] = ["completed", "failed", "skipped"];
+const ACTIVE_EXERCISE_STATUSES = ["pending", "in_progress"] as const;
 
 export async function getActiveSessionForUser(
   userId: string
@@ -91,6 +95,43 @@ export async function getCompletedSessionForPlanDayToday(params: {
     .limit(1);
 
   return session ?? null;
+}
+
+export async function getSessionForUserToday(params: {
+  userId: string;
+  dayStart: Date;
+  dayEnd: Date;
+}): Promise<WorkoutSession | null> {
+  const [activeOrPaused] = await db
+    .select()
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.userId, params.userId),
+        inArray(workoutSessions.status, ["active", "paused"])
+      )
+    )
+    .limit(1);
+
+  if (activeOrPaused) {
+    return activeOrPaused;
+  }
+
+  const [completedToday] = await db
+    .select()
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.userId, params.userId),
+        eq(workoutSessions.status, "completed"),
+        gte(workoutSessions.endedAt, params.dayStart),
+        lte(workoutSessions.endedAt, params.dayEnd)
+      )
+    )
+    .orderBy(desc(workoutSessions.endedAt))
+    .limit(1);
+
+  return completedToday ?? null;
 }
 
 export async function getLastCompletedSessionForPlanInRange(params: {
@@ -180,10 +221,46 @@ export async function startSessionFromPlanDay(params: {
   version: PlanVersion;
   planDay: PlanDay & { exercises: PlanExercise[] };
   weightUnit: WeightUnit;
-}): Promise<{ sessionId: string; created: boolean }> {
-  const existing = await getActiveSessionForUser(params.userId);
-  if (existing) {
-    return { sessionId: existing.id, created: false };
+  dayStart: Date;
+  dayEnd: Date;
+  todaysPlanDayId: string;
+}): Promise<
+  | { ok: true; sessionId: string; created: boolean }
+  | { ok: false; error: string }
+> {
+  if (params.planDay.id !== params.todaysPlanDayId) {
+    return {
+      ok: false,
+      error: "You can only start today's scheduled workout.",
+    };
+  }
+
+  if (params.planDay.scheduledWeekday == null) {
+    return {
+      ok: false,
+      error: "This workout day is missing a weekday assignment.",
+    };
+  }
+
+  const sessionToday = await getSessionForUserToday({
+    userId: params.userId,
+    dayStart: params.dayStart,
+    dayEnd: params.dayEnd,
+  });
+
+  if (sessionToday) {
+    if (["active", "paused"].includes(sessionToday.status)) {
+      return {
+        ok: true,
+        sessionId: sessionToday.id,
+        created: false,
+      };
+    }
+
+    return {
+      ok: false,
+      error: "You already completed a workout today.",
+    };
   }
 
   const [session] = await db
@@ -193,13 +270,14 @@ export async function startSessionFromPlanDay(params: {
       sourcePlanId: params.plan.id,
       sourcePlanVersionId: params.version.id,
       sourcePlanDayId: params.planDay.id,
+      scheduledWeekdaySnapshot: params.planDay.scheduledWeekday,
       titleSnapshot: params.planDay.title,
       status: "active",
     })
     .returning({ id: workoutSessions.id });
 
   if (!session) {
-    throw new Error("Could not start workout session.");
+    return { ok: false, error: "Could not start workout session." };
   }
 
   const orderedExercises = [...params.planDay.exercises].sort(
@@ -226,7 +304,7 @@ export async function startSessionFromPlanDay(params: {
     );
   }
 
-  return { sessionId: session.id, created: true };
+  return { ok: true, sessionId: session.id, created: true };
 }
 
 export async function getSessionById(
@@ -260,6 +338,7 @@ export async function getSetLogsForSession(
       performedLoad: setLogs.performedLoad,
       weightUnit: setLogs.weightUnit,
       status: setLogs.status,
+      notes: setLogs.notes,
       completedAt: setLogs.completedAt,
     })
     .from(setLogs)
@@ -280,15 +359,161 @@ export async function getSetLogsForSession(
     .orderBy(asc(sessionExercises.position), asc(setLogs.setNumber));
 }
 
-async function countSetLogsForExercise(
+async function countTerminalSetsForExercise(
   sessionExerciseId: string
 ): Promise<number> {
   const [result] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(setLogs)
-    .where(eq(setLogs.sessionExerciseId, sessionExerciseId));
+    .where(
+      and(
+        eq(setLogs.sessionExerciseId, sessionExerciseId),
+        inArray(setLogs.status, TERMINAL_SET_STATUSES)
+      )
+    );
 
   return result?.count ?? 0;
+}
+
+async function countCompletedSetsForExercise(
+  sessionExerciseId: string
+): Promise<number> {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(setLogs)
+    .where(
+      and(
+        eq(setLogs.sessionExerciseId, sessionExerciseId),
+        inArray(setLogs.status, ["completed", "failed"])
+      )
+    );
+
+  return result?.count ?? 0;
+}
+
+async function getLoggedSetNumbers(
+  sessionExerciseId: string
+): Promise<Set<number>> {
+  const rows = await db
+    .select({ setNumber: setLogs.setNumber })
+    .from(setLogs)
+    .where(eq(setLogs.sessionExerciseId, sessionExerciseId));
+
+  return new Set(rows.map((row) => row.setNumber));
+}
+
+async function advanceSessionAfterExerciseComplete(params: {
+  sessionId: string;
+  userId: string;
+  exercise: SessionExercise;
+  now: Date;
+}): Promise<{ sessionCompleted: boolean; activeRestEndsAt: Date | null }> {
+  const [nextExercise] = await db
+    .select()
+    .from(sessionExercises)
+    .where(
+      and(
+        eq(sessionExercises.sessionId, params.sessionId),
+        sql`${sessionExercises.position} > ${params.exercise.position}`,
+        inArray(sessionExercises.status, [...ACTIVE_EXERCISE_STATUSES])
+      )
+    )
+    .orderBy(asc(sessionExercises.position))
+    .limit(1);
+
+  let activeRestEndsAt: Date | null = null;
+
+  if (nextExercise) {
+    if (params.exercise.restSecondsSnapshot > 0) {
+      activeRestEndsAt = new Date(
+        params.now.getTime() + params.exercise.restSecondsSnapshot * 1000
+      );
+    }
+
+    await db
+      .update(workoutSessions)
+      .set({
+        currentExercisePosition: nextExercise.position,
+        activeRestEndsAt,
+        updatedAt: params.now,
+      })
+      .where(eq(workoutSessions.id, params.sessionId));
+  } else {
+    await endSession({
+      sessionId: params.sessionId,
+      userId: params.userId,
+      mode: "complete",
+    });
+    return { sessionCompleted: true, activeRestEndsAt: null };
+  }
+
+  return { sessionCompleted: false, activeRestEndsAt };
+}
+
+async function markExerciseCompleted(params: {
+  sessionId: string;
+  userId: string;
+  exercise: SessionExercise;
+  now: Date;
+}): Promise<{
+  exerciseCompleted: boolean;
+  sessionCompleted: boolean;
+  activeRestEndsAt: Date | null;
+}> {
+  await db
+    .update(sessionExercises)
+    .set({ status: "completed", updatedAt: params.now })
+    .where(eq(sessionExercises.id, params.exercise.id));
+
+  const { sessionCompleted, activeRestEndsAt } =
+    await advanceSessionAfterExerciseComplete({
+      sessionId: params.sessionId,
+      userId: params.userId,
+      exercise: params.exercise,
+      now: params.now,
+    });
+
+  return {
+    exerciseCompleted: true,
+    sessionCompleted,
+    activeRestEndsAt,
+  };
+}
+
+async function insertSkippedSetsForExercise(params: {
+  exercise: SessionExercise;
+  notes?: string | null;
+  now: Date;
+}): Promise<void> {
+  const loggedSetNumbers = await getLoggedSetNumbers(params.exercise.id);
+  const values = [];
+
+  for (
+    let setNumber = 1;
+    setNumber <= params.exercise.targetSetsSnapshot;
+    setNumber += 1
+  ) {
+    if (loggedSetNumbers.has(setNumber)) {
+      continue;
+    }
+
+    values.push({
+      sessionExerciseId: params.exercise.id,
+      setNumber,
+      plannedRepsMin: params.exercise.targetRepsMinSnapshot,
+      plannedRepsMax: params.exercise.targetRepsMaxSnapshot,
+      performedReps: null,
+      performedLoad: null,
+      weightUnit: params.exercise.weightUnitSnapshot,
+      status: "skipped" as const,
+      notes: params.notes ?? null,
+      completedAt: params.now,
+    });
+  }
+
+  if (values.length > 0) {
+    await db.insert(setLogs).values(values);
+  }
 }
 
 async function finalizeSessionExercises(sessionId: string): Promise<void> {
@@ -306,9 +531,9 @@ async function finalizeSessionExercises(sessionId: string): Promise<void> {
       continue;
     }
 
-    const loggedSetCount = await countSetLogsForExercise(exercise.id);
+    const completedSetCount = await countCompletedSetsForExercise(exercise.id);
     const nextStatus =
-      loggedSetCount > 0 ? ("completed" as const) : ("skipped" as const);
+      completedSetCount > 0 ? ("completed" as const) : ("skipped" as const);
 
     await db
       .update(sessionExercises)
@@ -388,10 +613,11 @@ export async function logSet(params: {
   sessionId: string;
   sessionExerciseId: string;
   setNumber: number;
-  performedReps: number;
+  performedReps?: number | null;
   performedLoad?: string | null;
   rpe?: string | null;
-  status?: "completed" | "failed" | "skipped";
+  notes?: string | null;
+  status?: SetStatus;
 }): Promise<{
   exerciseCompleted: boolean;
   sessionCompleted: boolean;
@@ -406,20 +632,30 @@ export async function logSet(params: {
   const exercise = loaded.exercises.find(
     (item) => item.id === params.sessionExerciseId
   );
-  if (!exercise) {
+  if (!exercise || exercise.status === "replaced" || exercise.status === "skipped") {
     return null;
   }
 
   if (
     params.setNumber < 1 ||
-    params.setNumber > exercise.targetSetsSnapshot ||
-    params.performedReps < 1
+    params.setNumber > exercise.targetSetsSnapshot
   ) {
     return null;
   }
 
-  const now = new Date();
   const setStatus = params.status ?? "completed";
+
+  if (setStatus === "completed" && (params.performedReps ?? 0) < 1) {
+    return null;
+  }
+
+  const now = new Date();
+  const performedReps =
+    setStatus === "skipped" ? null : (params.performedReps ?? null);
+  const performedLoad =
+    setStatus === "skipped"
+      ? null
+      : (params.performedLoad ?? exercise.targetLoadSnapshot);
 
   await db
     .insert(setLogs)
@@ -428,28 +664,33 @@ export async function logSet(params: {
       setNumber: params.setNumber,
       plannedRepsMin: exercise.targetRepsMinSnapshot,
       plannedRepsMax: exercise.targetRepsMaxSnapshot,
-      performedReps: params.performedReps,
-      performedLoad: params.performedLoad ?? exercise.targetLoadSnapshot,
+      performedReps,
+      performedLoad,
       weightUnit: exercise.weightUnitSnapshot,
       rpe: params.rpe ?? null,
       status: setStatus,
+      notes: params.notes ?? null,
       completedAt: now,
     })
     .onConflictDoUpdate({
       target: [setLogs.sessionExerciseId, setLogs.setNumber],
       set: {
-        performedReps: params.performedReps,
-        performedLoad: params.performedLoad ?? exercise.targetLoadSnapshot,
+        performedReps,
+        performedLoad,
         weightUnit: exercise.weightUnitSnapshot,
         rpe: params.rpe ?? null,
         status: setStatus,
+        notes: params.notes ?? null,
         completedAt: now,
         updatedAt: now,
       },
     });
 
-  const loggedSetCount = await countSetLogsForExercise(params.sessionExerciseId);
-  const exerciseCompleted = loggedSetCount >= exercise.targetSetsSnapshot;
+  const terminalSetCount = await countTerminalSetsForExercise(
+    params.sessionExerciseId
+  );
+  const exerciseCompleted =
+    terminalSetCount >= exercise.targetSetsSnapshot;
 
   if (exercise.status !== "completed") {
     await db
@@ -466,47 +707,27 @@ export async function logSet(params: {
   let nextSetNumber: number | null = null;
 
   if (exerciseCompleted) {
-    const [nextExercise] = await db
-      .select()
-      .from(sessionExercises)
-      .where(
-        and(
-          eq(sessionExercises.sessionId, params.sessionId),
-          sql`${sessionExercises.position} > ${exercise.position}`,
-          inArray(sessionExercises.status, ["pending", "in_progress"])
-        )
-      )
-      .orderBy(asc(sessionExercises.position))
-      .limit(1);
-
-    if (nextExercise) {
-      await db
-        .update(workoutSessions)
-        .set({
-          currentExercisePosition: nextExercise.position,
-          activeRestEndsAt:
-            exercise.restSecondsSnapshot > 0
-              ? new Date(now.getTime() + exercise.restSecondsSnapshot * 1000)
-              : null,
-          updatedAt: now,
-        })
-        .where(eq(workoutSessions.id, params.sessionId));
-
-      if (exercise.restSecondsSnapshot > 0) {
-        activeRestEndsAt = new Date(
-          now.getTime() + exercise.restSecondsSnapshot * 1000
-        );
-      }
-    } else {
-      await endSession({
-        sessionId: params.sessionId,
-        userId: params.userId,
-        mode: "complete",
-      });
-      sessionCompleted = true;
-    }
+    const advanceResult = await advanceSessionAfterExerciseComplete({
+      sessionId: params.sessionId,
+      userId: params.userId,
+      exercise,
+      now,
+    });
+    sessionCompleted = advanceResult.sessionCompleted;
+    activeRestEndsAt = advanceResult.activeRestEndsAt;
   } else {
-    nextSetNumber = params.setNumber + 1;
+    const loggedSetNumbers = await getLoggedSetNumbers(params.sessionExerciseId);
+    for (
+      let candidate = params.setNumber + 1;
+      candidate <= exercise.targetSetsSnapshot;
+      candidate += 1
+    ) {
+      if (!loggedSetNumbers.has(candidate)) {
+        nextSetNumber = candidate;
+        break;
+      }
+    }
+
     if (exercise.restSecondsSnapshot > 0) {
       activeRestEndsAt = new Date(
         now.getTime() + exercise.restSecondsSnapshot * 1000
@@ -528,6 +749,280 @@ export async function logSet(params: {
     nextSetNumber: exerciseCompleted ? null : nextSetNumber,
     activeRestEndsAt,
   };
+}
+
+export async function finishExerciseEarly(params: {
+  userId: string;
+  sessionId: string;
+  sessionExerciseId: string;
+  notes?: string | null;
+}): Promise<{
+  exerciseCompleted: boolean;
+  sessionCompleted: boolean;
+  activeRestEndsAt: Date | null;
+} | null> {
+  const loaded = await getSessionWithExercises(params.sessionId, params.userId);
+  if (!loaded || loaded.session.status !== "active") {
+    return null;
+  }
+
+  const exercise = loaded.exercises.find(
+    (item) => item.id === params.sessionExerciseId
+  );
+  if (
+    !exercise ||
+    exercise.status === "completed" ||
+    exercise.status === "skipped" ||
+    exercise.status === "replaced"
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+
+  await insertSkippedSetsForExercise({
+    exercise,
+    notes: params.notes,
+    now,
+  });
+
+  if (params.notes) {
+    await db
+      .update(sessionExercises)
+      .set({ notes: params.notes, updatedAt: now })
+      .where(eq(sessionExercises.id, params.sessionExerciseId));
+  }
+
+  return markExerciseCompleted({
+    sessionId: params.sessionId,
+    userId: params.userId,
+    exercise,
+    now,
+  });
+}
+
+export async function skipExercise(params: {
+  userId: string;
+  sessionId: string;
+  sessionExerciseId: string;
+  notes?: string | null;
+}): Promise<{
+  sessionCompleted: boolean;
+  activeRestEndsAt: Date | null;
+} | null> {
+  const loaded = await getSessionWithExercises(params.sessionId, params.userId);
+  if (!loaded || loaded.session.status !== "active") {
+    return null;
+  }
+
+  const exercise = loaded.exercises.find(
+    (item) => item.id === params.sessionExerciseId
+  );
+  if (
+    !exercise ||
+    exercise.status === "completed" ||
+    exercise.status === "skipped" ||
+    exercise.status === "replaced"
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+
+  await db
+    .update(sessionExercises)
+    .set({
+      status: "skipped",
+      notes: params.notes ?? null,
+      updatedAt: now,
+    })
+    .where(eq(sessionExercises.id, params.sessionExerciseId));
+
+  const { sessionCompleted, activeRestEndsAt } =
+    await advanceSessionAfterExerciseComplete({
+      sessionId: params.sessionId,
+      userId: params.userId,
+      exercise,
+      now,
+    });
+
+  return { sessionCompleted, activeRestEndsAt };
+}
+
+export async function replaceExercise(params: {
+  userId: string;
+  sessionId: string;
+  sessionExerciseId: string;
+  name: string;
+  reason?: string | null;
+}): Promise<{ replacementExerciseId: string } | null> {
+  const loaded = await getSessionWithExercises(params.sessionId, params.userId);
+  if (!loaded || loaded.session.status !== "active") {
+    return null;
+  }
+
+  const exercise = loaded.exercises.find(
+    (item) => item.id === params.sessionExerciseId
+  );
+  if (
+    !exercise ||
+    exercise.status === "completed" ||
+    exercise.status === "skipped" ||
+    exercise.status === "replaced"
+  ) {
+    return null;
+  }
+
+  const trimmedName = params.name.trim();
+  if (!trimmedName) {
+    return null;
+  }
+
+  const now = new Date();
+  const maxPosition = loaded.exercises.reduce(
+    (max, item) => Math.max(max, item.position),
+    0
+  );
+
+  await db
+    .update(sessionExercises)
+    .set({
+      status: "replaced",
+      replacementReason: params.reason ?? null,
+      position: maxPosition + 1,
+      updatedAt: now,
+    })
+    .where(eq(sessionExercises.id, params.sessionExerciseId));
+
+  const [replacement] = await db
+    .insert(sessionExercises)
+    .values({
+      sessionId: params.sessionId,
+      position: exercise.position,
+      nameSnapshot: trimmedName,
+      primaryMuscleSnapshot: exercise.primaryMuscleSnapshot,
+      equipmentSnapshot: exercise.equipmentSnapshot,
+      targetSetsSnapshot: exercise.targetSetsSnapshot,
+      targetRepsMinSnapshot: exercise.targetRepsMinSnapshot,
+      targetRepsMaxSnapshot: exercise.targetRepsMaxSnapshot,
+      targetLoadSnapshot: exercise.targetLoadSnapshot,
+      weightUnitSnapshot: exercise.weightUnitSnapshot,
+      restSecondsSnapshot: exercise.restSecondsSnapshot,
+      status: "pending",
+      replacesSessionExerciseId: params.sessionExerciseId,
+    })
+    .returning({ id: sessionExercises.id });
+
+  if (!replacement) {
+    return null;
+  }
+
+  await db
+    .update(workoutSessions)
+    .set({
+      currentExercisePosition: exercise.position,
+      updatedAt: now,
+    })
+    .where(eq(workoutSessions.id, params.sessionId));
+
+  return { replacementExerciseId: replacement.id };
+}
+
+export async function setCurrentExercise(params: {
+  userId: string;
+  sessionId: string;
+  position: number;
+}): Promise<boolean> {
+  const loaded = await getSessionWithExercises(params.sessionId, params.userId);
+  if (
+    !loaded ||
+    !["active", "paused"].includes(loaded.session.status)
+  ) {
+    return false;
+  }
+
+  const exercise = loaded.exercises.find(
+    (item) =>
+      item.position === params.position && item.status !== "replaced"
+  );
+  if (!exercise) {
+    return false;
+  }
+
+  await db
+    .update(workoutSessions)
+    .set({
+      currentExercisePosition: params.position,
+      updatedAt: new Date(),
+    })
+    .where(eq(workoutSessions.id, params.sessionId));
+
+  return true;
+}
+
+export async function reorderSessionExercises(params: {
+  userId: string;
+  sessionId: string;
+  orderedExerciseIds: string[];
+}): Promise<boolean> {
+  const loaded = await getSessionWithExercises(params.sessionId, params.userId);
+  if (
+    !loaded ||
+    !["active", "paused"].includes(loaded.session.status)
+  ) {
+    return false;
+  }
+
+  const activeExercises = loaded.exercises.filter(
+    (exercise) => exercise.status !== "replaced"
+  );
+  const activeIds = new Set(activeExercises.map((exercise) => exercise.id));
+
+  if (
+    params.orderedExerciseIds.length !== activeExercises.length ||
+    !params.orderedExerciseIds.every((id) => activeIds.has(id))
+  ) {
+    return false;
+  }
+
+  const currentExercise = activeExercises.find(
+    (exercise) =>
+      exercise.position === loaded.session.currentExercisePosition
+  );
+  const now = new Date();
+
+  // Two-phase update avoids unique (session_id, position) conflicts.
+  // neon-http does not support transactions, so these run sequentially.
+  for (const [index, exerciseId] of params.orderedExerciseIds.entries()) {
+    await db
+      .update(sessionExercises)
+      .set({ position: 1000 + index + 1, updatedAt: now })
+      .where(eq(sessionExercises.id, exerciseId));
+  }
+
+  for (const [index, exerciseId] of params.orderedExerciseIds.entries()) {
+    await db
+      .update(sessionExercises)
+      .set({ position: index + 1, updatedAt: now })
+      .where(eq(sessionExercises.id, exerciseId));
+  }
+
+  if (currentExercise) {
+    const newPosition =
+      params.orderedExerciseIds.indexOf(currentExercise.id) + 1;
+
+    if (newPosition > 0) {
+      await db
+        .update(workoutSessions)
+        .set({
+          currentExercisePosition: newPosition,
+          updatedAt: now,
+        })
+        .where(eq(workoutSessions.id, params.sessionId));
+    }
+  }
+
+  return true;
 }
 
 export async function getSessionHistoryPage(params: {

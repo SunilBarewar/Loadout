@@ -41,7 +41,7 @@ export default async function TodayPage() {
             </span>
             <span className="text-muted-foreground">
               · {data.adherence.completedThisWeek}/
-              {data.adherence.plannedThisWeek} completed
+              {data.adherence.plannedThisWeek} sessions completed
             </span>
           </div>
         )}

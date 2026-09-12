@@ -15,6 +15,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   endSessionAction,
   pauseSessionAction,
@@ -34,6 +36,7 @@ export function CompactSessionHeader({
   const [isPending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const [sessionNotes, setSessionNotes] = React.useState("");
 
   const isOnActiveSessionPage =
     activeSession != null && pathname === `/session/${activeSession.id}`;
@@ -86,7 +89,11 @@ export function CompactSessionHeader({
   function handleEndSession(mode: "complete" | "abandon") {
     setError(null);
     startTransition(async () => {
-      const result = await endSessionAction(activeSession!.id, mode);
+      const result = await endSessionAction(
+        activeSession!.id,
+        mode,
+        sessionNotes.trim() || null
+      );
       if (!result.ok) {
         setError(result.error);
       }
@@ -156,6 +163,16 @@ export function CompactSessionHeader({
                 in your history.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="space-y-1.5 px-1">
+              <Label htmlFor="session-notes">Session notes (optional)</Label>
+              <Textarea
+                id="session-notes"
+                value={sessionNotes}
+                onChange={(event) => setSessionNotes(event.target.value)}
+                placeholder="e.g. felt fatigued, shortened workout"
+                rows={2}
+              />
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep going</AlertDialogCancel>
               <AlertDialogAction

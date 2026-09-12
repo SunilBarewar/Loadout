@@ -1,5 +1,6 @@
 export {
   activatePlan,
+  ensurePlanDaysHaveWeekdays,
   getActivePlanForUser,
   getPlanStatusesForUser,
   getPlanSummaryForContext,
@@ -35,6 +36,8 @@ export {
   WEEKDAY_LABELS,
   WEEKDAY_LABELS_SHORT,
   WEEKDAY_FIELD_DESCRIPTION,
+  DEFAULT_WEEKDAY_PATTERNS,
+  assignDefaultWeekdays,
   type Weekday,
 } from "./weekdays";
 

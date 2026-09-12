@@ -15,10 +15,9 @@ import {
   resolveTomorrowPlanDay,
 } from "@/features/plans";
 import {
-  getActiveSessionForUser,
-  getCompletedSessionForPlanDayToday,
   getCompletedSessionsForWeek,
   getLastCompletedSessionForPlanInRange,
+  getSessionForUserToday,
   getWeeklyVolume,
 } from "@/features/sessions/repository";
 import type { TodayPageData, TodaySessionState } from "@/features/sessions/schemas";
@@ -30,24 +29,30 @@ import {
 } from "./formatters";
 
 function buildSessionState(params: {
-  activeSession: Awaited<ReturnType<typeof getActiveSessionForUser>>;
-  completedToday: Awaited<ReturnType<typeof getCompletedSessionForPlanDayToday>>;
+  sessionToday: Awaited<ReturnType<typeof getSessionForUserToday>>;
   todayPlanDayId: string | null;
 }): TodaySessionState {
-  if (params.activeSession) {
+  if (!params.sessionToday) {
+    return { kind: "none" };
+  }
+
+  if (
+    params.sessionToday.status === "active" ||
+    params.sessionToday.status === "paused"
+  ) {
     return {
-      kind: params.activeSession.status === "paused" ? "paused" : "active",
-      sessionId: params.activeSession.id,
+      kind: params.sessionToday.status === "paused" ? "paused" : "active",
+      sessionId: params.sessionToday.id,
       matchesTodayPlanDay:
         params.todayPlanDayId != null &&
-        params.activeSession.sourcePlanDayId === params.todayPlanDayId,
+        params.sessionToday.sourcePlanDayId === params.todayPlanDayId,
     };
   }
 
-  if (params.completedToday) {
+  if (params.sessionToday.status === "completed") {
     return {
       kind: "completed_today",
-      sessionId: params.completedToday.id,
+      sessionId: params.sessionToday.id,
     };
   }
 
@@ -153,13 +158,11 @@ export async function getTodayPageData(user: User): Promise<TodayPageData> {
   const schedulingMode = inferSchedulingMode(days, plan.daysPerWeek);
 
   const [
-    activeSession,
     lastCompletedThisWeek,
     completedThisWeek,
     weeklyVolume,
     previousVolume,
   ] = await Promise.all([
-    getActiveSessionForUser(user.id),
     getLastCompletedSessionForPlanInRange({
       userId: user.id,
       planId: plan.id,
@@ -208,19 +211,14 @@ export async function getTodayPageData(user: User): Promise<TodayPageData> {
     ? (days.find((day) => day.id === resolvedTomorrowPlanDay.id) ?? null)
     : null;
 
-  const completedToday =
-    todayPlanDay != null
-      ? await getCompletedSessionForPlanDayToday({
-          userId: user.id,
-          planDayId: todayPlanDay.id,
-          dayStart,
-          dayEnd,
-        })
-      : null;
+  const sessionToday = await getSessionForUserToday({
+    userId: user.id,
+    dayStart,
+    dayEnd,
+  });
 
   const session = buildSessionState({
-    activeSession,
-    completedToday,
+    sessionToday,
     todayPlanDayId: todayPlanDay?.id ?? null,
   });
 

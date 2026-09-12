@@ -97,7 +97,11 @@ export function PlanCard({ plan, highlighted = false }: PlanCardProps) {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-wrap gap-2 pt-1">
-        <Button render={<Link href={`/plan/${plan.planId}`} />} size="sm">
+        <Button
+          nativeButton={false}
+          render={<Link href={`/plan/${plan.planId}`} />}
+          size="sm"
+        >
           View plan
         </Button>
         {plan.state === "draft" && (

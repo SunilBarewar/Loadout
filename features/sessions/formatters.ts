@@ -65,6 +65,9 @@ export function serializeExercise(
     weightUnitSnapshot: exercise.weightUnitSnapshot,
     restSecondsSnapshot: exercise.restSecondsSnapshot,
     status: exercise.status,
+    notes: exercise.notes,
+    replacementReason: exercise.replacementReason,
+    replacesSessionExerciseId: exercise.replacesSessionExerciseId,
   };
 }
 
@@ -76,6 +79,7 @@ export function serializeSetLog(log: {
   performedLoad: string | null;
   weightUnit: "kg" | "lb" | null;
   status: "completed" | "failed" | "skipped";
+  notes: string | null;
   completedAt: Date | null;
 }): SerializedSetLog {
   return {
@@ -86,6 +90,7 @@ export function serializeSetLog(log: {
     performedLoad: log.performedLoad,
     weightUnit: log.weightUnit,
     status: log.status,
+    notes: log.notes,
     completedAt: log.completedAt?.toISOString() ?? null,
   };
 }
@@ -101,6 +106,7 @@ export function buildSessionPageData(params: {
     performedLoad: string | null;
     weightUnit: "kg" | "lb" | null;
     status: "completed" | "failed" | "skipped";
+    notes: string | null;
     completedAt: Date | null;
   }>;
 }): SessionPageData {
@@ -180,11 +186,34 @@ export function formatTargetLabel(exercise: {
 }
 
 export function formatLoggedSetLabel(log: SerializedSetLog): string {
+  if (log.status === "skipped") {
+    return log.notes ? `Skipped · ${log.notes}` : "Skipped";
+  }
+
+  if (log.status === "failed") {
+    const reps = log.performedReps ?? "—";
+    const base = `Failed · ${reps} reps`;
+    return log.notes ? `${base} · ${log.notes}` : base;
+  }
+
   const reps = log.performedReps ?? "—";
   const load =
     log.performedLoad != null
       ? `${log.performedLoad} ${log.weightUnit ?? "lb"}`
       : null;
 
-  return load ? `${reps} reps @ ${load}` : `${reps} reps`;
+  const base = load ? `${reps} reps @ ${load}` : `${reps} reps`;
+  return log.notes ? `${base} · ${log.notes}` : base;
+}
+
+export function countTerminalSets(
+  logs: SerializedSetLog[],
+  targetSets: number
+): number {
+  const terminalStatuses = new Set(["completed", "failed", "skipped"]);
+  const terminalCount = logs.filter((log) =>
+    terminalStatuses.has(log.status)
+  ).length;
+
+  return Math.min(terminalCount, targetSets);
 }

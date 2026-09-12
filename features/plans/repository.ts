@@ -21,6 +21,7 @@ import type {
   ProposeWorkoutPlanInput,
   ReviseWorkoutPlanInput,
 } from "./schemas";
+import { assignDefaultWeekdays } from "./weekdays";
 
 export class PlanCompilerError extends Error {
   constructor(message: string) {
@@ -500,6 +501,54 @@ export async function savePlanDraft(
   return { ok: true, state: "saved" };
 }
 
+export async function ensurePlanDaysHaveWeekdays(params: {
+  versionId: string;
+  daysPerWeek: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const days = await db
+    .select()
+    .from(planDays)
+    .where(eq(planDays.planVersionId, params.versionId))
+    .orderBy(asc(planDays.dayNumber));
+
+  if (days.length === 0) {
+    return { ok: false, error: "This plan has no workout days." };
+  }
+
+  if (days.length !== params.daysPerWeek) {
+    return {
+      ok: false,
+      error: "Plan days do not match the configured days per week.",
+    };
+  }
+
+  const defaultWeekdays = assignDefaultWeekdays(params.daysPerWeek);
+  const assignedWeekdays = days.map(
+    (day, index) => day.scheduledWeekday ?? defaultWeekdays[index]
+  );
+
+  for (const [index, day] of days.entries()) {
+    const weekday = assignedWeekdays[index];
+
+    if (day.scheduledWeekday !== weekday) {
+      await db
+        .update(planDays)
+        .set({ scheduledWeekday: weekday })
+        .where(eq(planDays.id, day.id));
+    }
+  }
+
+  if (new Set(assignedWeekdays).size !== assignedWeekdays.length) {
+    return {
+      ok: false,
+      error:
+        "Each workout day needs a unique weekday before this plan can be activated.",
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function activatePlan(
   planId: string,
   userId: string,
@@ -508,6 +557,14 @@ export async function activatePlan(
   const verified = await verifyPlanVersion(planId, userId, versionId);
   if (!verified.ok) {
     return verified;
+  }
+
+  const weekdayResult = await ensurePlanDaysHaveWeekdays({
+    versionId,
+    daysPerWeek: verified.plan.daysPerWeek,
+  });
+  if (!weekdayResult.ok) {
+    return weekdayResult;
   }
 
   const activePlans = await db
