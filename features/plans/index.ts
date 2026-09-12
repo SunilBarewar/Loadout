@@ -39,6 +39,7 @@ export {
 } from "./weekdays";
 
 export {
+  trainingGoalSchema,
   proposeWorkoutPlanSchema,
   reviseWorkoutPlanSchema,
   type ProposeWorkoutPlanInput,

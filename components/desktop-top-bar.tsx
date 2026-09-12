@@ -32,10 +32,16 @@ export function DesktopTopBar() {
         subtitle: "Completed workout logs and progression metrics",
       };
     }
+    if (pathname.startsWith("/settings/equipment")) {
+      return {
+        title: "Equipment & units",
+        subtitle: "Gym setup, weight units, and equipment notes",
+      };
+    }
     if (pathname.startsWith("/settings")) {
       return {
         title: "Settings",
-        subtitle: "Equipment, units, limitations, and preferences",
+        subtitle: "Training preferences, limitations, and account",
       };
     }
     return {

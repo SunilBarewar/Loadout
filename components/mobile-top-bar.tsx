@@ -4,7 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { UserMenu } from "@/components/user-menu";
 
-export function MobileTopBar() {
+type MobileTopBarProps = {
+  activePlanTitle?: string | null;
+};
+
+export function MobileTopBar({ activePlanTitle = null }: MobileTopBarProps) {
   return (
     <header className="flex min-[901px]:hidden h-14 w-full items-center justify-between border-b border-border bg-card/95 backdrop-blur-md px-4 shrink-0 select-none z-30">
       {/* Brand */}
@@ -16,7 +20,7 @@ export function MobileTopBar() {
 
       {/* Profile menu on the right */}
       <div className="flex items-center gap-2">
-        <UserMenu variant="compact" />
+        <UserMenu variant="compact" activePlanTitle={activePlanTitle} />
       </div>
     </header>
   );

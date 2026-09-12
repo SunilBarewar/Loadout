@@ -62,7 +62,11 @@ const secondaryNavItems: NavItem[] = [
   },
 ];
 
-export function AppSidebar() {
+type AppSidebarProps = {
+  activePlanTitle?: string | null;
+};
+
+export function AppSidebar({ activePlanTitle = null }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -154,7 +158,7 @@ export function AppSidebar() {
 
       {/* User Menu at Bottom */}
       <SidebarFooter className="p-3 border-t border-border bg-card">
-        <UserMenu variant="sidebar" />
+        <UserMenu variant="sidebar" activePlanTitle={activePlanTitle} />
       </SidebarFooter>
     </Sidebar>
   );

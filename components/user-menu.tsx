@@ -18,9 +18,13 @@ import { Settings, LogOut, ChevronsUpDown, Shield } from "lucide-react";
 
 interface UserMenuProps {
   variant?: "sidebar" | "compact";
+  activePlanTitle?: string | null;
 }
 
-export function UserMenu({ variant = "sidebar" }: UserMenuProps) {
+export function UserMenu({
+  variant = "sidebar",
+  activePlanTitle = null,
+}: UserMenuProps) {
   const router = useRouter();
 
   // Safely access Clerk user details if configured
@@ -107,10 +111,20 @@ export function UserMenu({ variant = "sidebar" }: UserMenuProps) {
           <DropdownMenuLabel className="px-2.5 py-2">
             <div className="text-sm font-bold text-foreground">{displayName}</div>
             <div className="truncate text-xs text-muted-foreground">{displayEmail}</div>
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-primary" />
-              <span>Active: Hypertrophy 4-Day</span>
-            </div>
+            {activePlanTitle ? (
+              <Link
+                href="/plans"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="size-1.5 rounded-full bg-primary" />
+                <span className="text-ellipsis whitespace-nowrap overflow-hidden max-w-[200px]">Active: {activePlanTitle}</span>
+              </Link>
+            ) : (
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-muted-foreground/50" />
+                <span>No active plan</span>
+              </span>
+            )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
 
@@ -124,7 +138,7 @@ export function UserMenu({ variant = "sidebar" }: UserMenuProps) {
         </DropdownMenuItem>
 
         <DropdownMenuItem
-          render={<Link href="/settings" className="flex w-full items-center gap-2.5 cursor-pointer px-2.5 py-2 rounded-sm text-sm text-foreground hover:bg-surface-2 transition-colors" />}
+          render={<Link href="/settings/equipment" className="flex w-full items-center gap-2.5 cursor-pointer px-2.5 py-2 rounded-sm text-sm text-foreground hover:bg-surface-2 transition-colors" />}
         >
           <Shield className="size-4 text-muted-foreground" />
           <span>Equipment & Units</span>

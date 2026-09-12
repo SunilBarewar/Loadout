@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { EquipmentSelector } from "./equipment-selector";
 import type { EquipmentPickerPartData } from "../schemas/equipment-picker";
 
 interface EquipmentPickerCardProps {
@@ -35,7 +35,6 @@ export function EquipmentPickerCard({ data, threadId }: EquipmentPickerCardProps
     setSelectedSlugs(data.selectedSlugs);
   }, [savedSlugsKey]);
 
-  const selectedSet = new Set(selectedSlugs);
   const canSave = Boolean(threadId) && data.availableEquipment.length > 0;
 
   function toggleSlug(slug: string) {
@@ -91,54 +90,23 @@ export function EquipmentPickerCard({ data, threadId }: EquipmentPickerCardProps
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {data.availableEquipment.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Equipment catalog is empty. Run{" "}
-            <code className="text-xs">npm run db:seed:equipment</code> and refresh
-            this thread.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {data.availableEquipment.map((item) => {
-              const isSelected = selectedSet.has(item.slug);
-              return (
-                <button
-                  key={item.slug}
-                  type="button"
-                  aria-pressed={isSelected}
-                  disabled={isPending}
-                  onClick={() => toggleSlug(item.slug)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-surface-2 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  )}
-                >
-                  {item.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <EquipmentSelector
+          availableEquipment={data.availableEquipment}
+          selectedSlugs={selectedSlugs}
+          onToggle={toggleSlug}
+          disabled={isPending}
+        />
         {data.allowCustomNotes && (
           <p className="text-xs text-muted-foreground">
             You can add custom equipment notes in your profile settings.
           </p>
         )}
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">
-            {selectedSet.size} of {data.availableEquipment.length} selected
-          </Badge>
-          {saved && (
-            <span className="inline-flex items-center gap-1 text-xs text-primary">
-              <Check className="size-3.5" />
-              Saved
-            </span>
-          )}
-        </div>
+        {saved && (
+          <span className="inline-flex items-center gap-1 text-xs text-primary">
+            <Check className="size-3.5" />
+            Saved
+          </span>
+        )}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </CardContent>
       {canSave && (

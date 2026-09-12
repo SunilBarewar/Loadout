@@ -99,9 +99,19 @@ export async function getUserProfileWithEquipment(
   };
 }
 
+export type UserPlanningProfileUpdate = Partial<{
+  primaryGoal: User["primaryGoal"];
+  experienceLevel: User["experienceLevel"];
+  defaultDaysPerWeek: number | null;
+  defaultSessionMinutes: number | null;
+  limitations: string | null;
+  weightUnit: User["weightUnit"];
+  customEquipmentNotes: string | null;
+}>;
+
 export async function updateUserPlanningProfile(
   userId: string,
-  facts: PlanningFactsInput
+  facts: PlanningFactsInput | UserPlanningProfileUpdate
 ): Promise<User | null> {
   const updates: Partial<typeof users.$inferInsert> = {
     updatedAt: new Date(),
@@ -124,6 +134,9 @@ export async function updateUserPlanningProfile(
   }
   if (facts.weightUnit !== undefined) {
     updates.weightUnit = facts.weightUnit;
+  }
+  if (facts.customEquipmentNotes !== undefined) {
+    updates.customEquipmentNotes = facts.customEquipmentNotes;
   }
 
   if (Object.keys(updates).length === 1) {

@@ -6,6 +6,7 @@ import { MobileTopBar } from "@/components/mobile-top-bar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { CompactSessionHeader } from "@/components/compact-session-header";
 import { ensureCurrentUser } from "@/features/users";
+import { getUserMenuData } from "@/features/settings";
 import { getActiveSessionForUser } from "@/features/sessions/repository";
 import { toActiveSessionHeaderData } from "@/features/sessions/formatters";
 
@@ -15,6 +16,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await ensureCurrentUser();
+  const userMenuData = user ? await getUserMenuData(user.id) : null;
   const activeSession = user
     ? await getActiveSessionForUser(user.id)
     : null;
@@ -32,7 +34,7 @@ export default async function AppLayout({
       className="h-svh w-full overflow-hidden bg-background text-foreground"
     >
       {/* 1. Fixed Left Sidebar on Desktop (> 900px) */}
-      <AppSidebar />
+      <AppSidebar activePlanTitle={userMenuData?.activePlanTitle ?? null} />
 
       {/* 2. Main Workspace / Content Column */}
       <div className="flex flex-1 flex-col min-w-0 h-svh overflow-hidden bg-background">
@@ -40,7 +42,7 @@ export default async function AppLayout({
         <DesktopTopBar />
 
         {/* Mobile Top Bar (<= 900px) */}
-        <MobileTopBar />
+        <MobileTopBar activePlanTitle={userMenuData?.activePlanTitle ?? null} />
 
         {/* Compact Session Header (only active during live workouts) */}
         <CompactSessionHeader activeSession={activeSessionHeaderData} />
