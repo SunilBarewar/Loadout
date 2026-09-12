@@ -568,6 +568,24 @@ export async function getPlanSummaryForContext(
   };
 }
 
+export async function getActivePlanForUser(
+  userId: string
+): Promise<PlanWithVersion | null> {
+  const [plan] = await db
+    .select()
+    .from(workoutPlans)
+    .where(
+      and(eq(workoutPlans.userId, userId), eq(workoutPlans.status, "active"))
+    )
+    .limit(1);
+
+  if (!plan) {
+    return null;
+  }
+
+  return getPlanWithVersion(plan.id, userId);
+}
+
 export async function getPlanStatusesForUser(
   userId: string,
   planIds: string[]

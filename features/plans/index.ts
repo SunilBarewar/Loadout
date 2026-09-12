@@ -1,5 +1,6 @@
 export {
   activatePlan,
+  getActivePlanForUser,
   getPlanStatusesForUser,
   getPlanSummaryForContext,
   insertDraftPlan,
@@ -10,6 +11,13 @@ export {
   type PlanSummaryForContext,
   type PlanWithVersion,
 } from "./repository";
+
+export {
+  inferSchedulingMode,
+  resolvePlanDayForDate,
+  resolveTomorrowPlanDay,
+  type SchedulingMode,
+} from "./scheduling";
 
 export {
   savePlanDraftAction,
