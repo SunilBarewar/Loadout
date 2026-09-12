@@ -6,13 +6,22 @@ import { MobileTopBar } from "@/components/mobile-top-bar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { CompactSessionHeader } from "@/components/compact-session-header";
 import { ensureCurrentUser } from "@/features/users";
+import { getActiveSessionForUser } from "@/features/sessions/repository";
+import { toActiveSessionHeaderData } from "@/features/sessions/formatters";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await ensureCurrentUser();
+  const user = await ensureCurrentUser();
+  const activeSession = user
+    ? await getActiveSessionForUser(user.id)
+    : null;
+  const activeSessionHeaderData = activeSession
+    ? toActiveSessionHeaderData(activeSession)
+    : null;
+
   return (
     <SidebarProvider
       style={
@@ -34,7 +43,7 @@ export default async function AppLayout({
         <MobileTopBar />
 
         {/* Compact Session Header (only active during live workouts) */}
-        <CompactSessionHeader />
+        <CompactSessionHeader activeSession={activeSessionHeaderData} />
 
         {/* Scrollable Page Content (independent scroll from sidebar) */}
         <main className="flex-1 min-h-0 overflow-y-auto bg-background focus:outline-none max-[900px]:pb-20">
