@@ -1,4 +1,5 @@
 import { ClerkProvider } from '@clerk/nextjs';
+import { Toaster } from "@/components/ui/toast";
 import "./globals.css";
 import type { Metadata } from "next";
 
@@ -21,6 +22,7 @@ export default function RootLayout({
       <html lang="en" className="dark">
         <body style={{ margin: 0, padding: 0 }}>
           {children}
+          <Toaster />
         </body>
       </html>
     );
@@ -31,6 +33,7 @@ export default function RootLayout({
       <html lang="en" className="dark">
         <body style={{ margin: 0, padding: 0 }}>
           {children}
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>

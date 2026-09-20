@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, Target } from "lucide-react";
@@ -10,6 +10,7 @@ import {
 } from "@/features/plans/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import {
   Card,
   CardContent,
@@ -34,11 +35,17 @@ const stateLabels: Record<WorkoutPlanPartData["state"], string> = {
 export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [state, setState] = useState(data.state);
+  const [isSaving, startSaveTransition] = useTransition();
+  const [isActivating, startActivateTransition] = useTransition();
+
+  useEffect(() => {
+    setState(data.state);
+  }, [data.state]);
 
   function handleSaveDraft() {
     setError(null);
-    startTransition(async () => {
+    startSaveTransition(async () => {
       const result = await savePlanDraftAction(
         data.planId,
         data.versionId,
@@ -47,16 +54,27 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
 
       if (!result.ok) {
         setError(result.error);
+        toast.add({
+          type: "error",
+          title: data.isRevision ? "Could not save revision" : "Could not save draft",
+          description: result.error,
+        });
         return;
       }
 
+      setState(result.state);
+      toast.add({
+        type: "success",
+        title: data.isRevision ? "Revision saved" : "Draft saved",
+        description: `${data.title} is ready to activate.`,
+      });
       router.refresh();
     });
   }
 
   function handleActivate() {
     setError(null);
-    startTransition(async () => {
+    startActivateTransition(async () => {
       const result = await activatePlanAction(
         data.planId,
         data.versionId,
@@ -65,9 +83,20 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
 
       if (!result.ok) {
         setError(result.error);
+        toast.add({
+          type: "error",
+          title: "Could not activate plan",
+          description: result.error,
+        });
         return;
       }
 
+      setState(result.state);
+      toast.add({
+        type: "success",
+        title: "Plan activated",
+        description: `${data.title} is now your active routine.`,
+      });
       router.refresh();
     });
   }
@@ -85,7 +114,7 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
               </CardDescription>
             )}
           </div>
-          <Badge variant="secondary">{stateLabels[data.state]}</Badge>
+          <Badge variant="secondary">{stateLabels[state]}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -103,7 +132,7 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
             {data.summary}
           </p>
         )}
-        {data.state === "draft" && data.isRevision && (
+        {state === "draft" && data.isRevision && (
           <p className="text-sm text-muted-foreground">
             Review the updated schedule below, then save this revision to keep
             the changes.
@@ -119,28 +148,28 @@ export function WorkoutPlanCard({ data, threadId }: WorkoutPlanCardProps) {
         >
           View plan
         </Button>
-        {data.state === "draft" && (
+        {state === "draft" && (
           <Button
             variant="outline"
             size="sm"
-            disabled={isPending}
+            disabled={isSaving}
             onClick={handleSaveDraft}
           >
-            {isPending
+            {isSaving
               ? "Saving…"
               : data.isRevision
                 ? "Save revision"
                 : "Save draft"}
           </Button>
         )}
-        {data.state === "saved" && (
+        {state === "saved" && (
           <Button
             size="sm"
-            disabled={isPending}
+            disabled={isActivating}
             onClick={handleActivate}
           >
             <CheckCircle2 className="size-3.5" />
-            {isPending ? "Activating…" : "Activate plan"}
+            {isActivating ? "Activating…" : "Activate plan"}
           </Button>
         )}
       </CardFooter>

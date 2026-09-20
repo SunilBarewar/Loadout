@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { savePlanDraftAction } from "@/features/plans/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import {
   Card,
   CardContent,
@@ -31,7 +32,12 @@ const stateLabels: Record<PlanUpdatePartData["state"], string> = {
 export function PlanUpdateCard({ data, threadId }: PlanUpdateCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState(data.state);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setState(data.state);
+  }, [data.state]);
 
   function handleSaveDraft() {
     setError(null);
@@ -44,9 +50,20 @@ export function PlanUpdateCard({ data, threadId }: PlanUpdateCardProps) {
 
       if (!result.ok) {
         setError(result.error);
+        toast.add({
+          type: "error",
+          title: "Could not save revision",
+          description: result.error,
+        });
         return;
       }
 
+      setState(result.state);
+      toast.add({
+        type: "success",
+        title: "Revision saved",
+        description: `${data.title} has been updated.`,
+      });
       router.refresh();
     });
   }
@@ -64,7 +81,7 @@ export function PlanUpdateCard({ data, threadId }: PlanUpdateCardProps) {
             </CardTitle>
             <CardDescription className="truncate">{data.title}</CardDescription>
           </div>
-          <Badge variant="secondary">{stateLabels[data.state]}</Badge>
+          <Badge variant="secondary">{stateLabels[state]}</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -74,7 +91,7 @@ export function PlanUpdateCard({ data, threadId }: PlanUpdateCardProps) {
         {data.autoCommitted ? (
           <p className="mt-2 text-xs text-muted-foreground">
             Changes are already saved
-            {data.state === "active" ? " and your plan stays active." : "."}
+            {state === "active" ? " and your plan stays active." : "."}
           </p>
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -93,7 +110,7 @@ export function PlanUpdateCard({ data, threadId }: PlanUpdateCardProps) {
           View plan
           <ArrowRight className="size-3.5" />
         </Button>
-        {data.state === "draft" && !data.autoCommitted && (
+        {state === "draft" && !data.autoCommitted && (
           <Button size="sm" disabled={isPending} onClick={handleSaveDraft}>
             {isPending ? "Saving…" : "Save revision"}
           </Button>

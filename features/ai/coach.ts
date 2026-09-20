@@ -1,4 +1,5 @@
 import { openai } from '@ai-sdk/openai';
+import { google } from '@ai-sdk/google';
 import {
   convertToModelMessages,
   isStepCount,
@@ -26,9 +27,11 @@ export async function createCoachStream(params: {
     planningContext: params.planningContext,
     allowedTools,
   });
+  
+  const model = process.env.MODEL_PROVIDER === 'openai' ? openai('gpt-4.1') : google('gemini-3.5-flash');
 
   return streamText({
-    model: openai('gpt-4.1'),
+    model,
     instructions: buildCoachInstructions(params.purpose, params.planningContext),
     messages: await convertToModelMessages(params.messages),
     tools,
