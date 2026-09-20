@@ -8,7 +8,6 @@ import {
 } from "@/features/planner/repository";
 import { getPlanStatusesForUser } from "@/features/plans";
 import {
-  buildMessagesSyncKey,
   extractPlanIdsFromMessages,
   hydrateStoredMessages,
 } from "@/features/ui-registry/mappers/hydrate-stored-parts";
@@ -50,11 +49,10 @@ export default async function PlannerThreadPage({
     planStates,
   });
   const initialMessages = storedMessagesToUIMessages(hydratedMessages);
-  const messagesSyncKey = buildMessagesSyncKey(hydratedMessages);
 
   return (
     <PlannerChat
-      key={`${threadId}-${messagesSyncKey}`}
+      key={threadId}
       threadId={threadId}
       initialPrompt={initialPrompt}
       initialMessages={initialMessages}

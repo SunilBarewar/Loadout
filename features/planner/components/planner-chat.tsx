@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
+import { ChatAssistantStatus } from "@/features/planner/components/chat-assistant-status";
 import { MarkdownContent } from "@/features/planner/components/markdown-content";
 import { ChatPartRenderer } from "@/features/ui-registry";
 import type { StoredChatPart } from "@/features/ui-registry";
@@ -105,6 +106,38 @@ function shouldRenderDataPart(
   return true;
 }
 
+function AssistantMessageText({
+  parts,
+  isStreamingMessage,
+}: {
+  parts: UIMessage["parts"];
+  isStreamingMessage: boolean;
+}) {
+  const text = messageText(parts);
+  if (!text) return null;
+
+  const textPart = parts.find(
+    (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
+      part.type === "text"
+  );
+  const isActivelyStreaming =
+    isStreamingMessage &&
+    textPart != null &&
+    "state" in textPart &&
+    textPart.state === "streaming";
+
+  if (isActivelyStreaming) {
+    return (
+      <p className="whitespace-pre-wrap leading-relaxed">
+        {text}
+        <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary align-middle" />
+      </p>
+    );
+  }
+
+  return <MarkdownContent content={text} />;
+}
+
 export function PlannerChat({
   threadId,
   initialPrompt,
@@ -114,19 +147,22 @@ export function PlannerChat({
   const [input, setInput] = useState("");
   const sentInitialPrompt = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/chat" }),
+    []
+  );
 
   const { messages, sendMessage, status, error, stop } = useChat({
     id: threadId,
     messages: initialMessages,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-    }),
+    transport,
+    throttle: 50,
     onFinish: () => {
       router.refresh();
     },
   });
 
- useEffect(() => {
+  useEffect(() => {
     if (!initialPrompt?.trim() || sentInitialPrompt.current) return;
     sentInitialPrompt.current = true;
     void sendMessage({ text: initialPrompt.trim() });
@@ -139,6 +175,18 @@ export function PlannerChat({
 
   const isBusy = status === "submitted" || status === "streaming";
   const scheduleVisibility = buildScheduleVisibility(messages);
+  const lastMessage = messages.at(-1);
+  const lastAssistantMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const lastAssistantText = lastAssistantMessage
+    ? messageText(lastAssistantMessage.parts).trim()
+    : "";
+  const showAssistantStatus =
+    isBusy &&
+    (lastMessage?.role === "user" ||
+      !lastAssistantMessage ||
+      lastAssistantText.length === 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,12 +240,24 @@ export function PlannerChat({
           </p>
         )}
 
-        {messages.map((message) => {
+        {messages.map((message, messageIndex) => {
           const isUser = message.role === "user";
           const text = messageText(message.parts);
           const dataParts = message.parts.filter(isDataRegistryPart);
+          const isStreamingMessage =
+            isBusy &&
+            message.role === "assistant" &&
+            messageIndex === messages.length - 1;
 
           if (!hasRenderableContent(message.parts) && message.role !== "assistant") {
+            return null;
+          }
+
+          if (
+            message.role === "assistant" &&
+            !hasRenderableContent(message.parts) &&
+            isStreamingMessage
+          ) {
             return null;
           }
 
@@ -217,7 +277,7 @@ export function PlannerChat({
                   isUser ? "items-end" : "w-full"
                 )}
               >
-                {(text || (message.role === "assistant" && isBusy && !dataParts.length)) && (
+                {text && (
                   <div
                     className={cn(
                       "rounded-md border p-4 text-sm leading-relaxed",
@@ -227,13 +287,12 @@ export function PlannerChat({
                     )}
                   >
                     {isUser ? (
-                      text || (status === "streaming" ? "…" : "")
-                    ) : text ? (
-                      <MarkdownContent content={text} />
-                    ) : status === "streaming" ? (
-                      "…"
+                      text
                     ) : (
-                      ""
+                      <AssistantMessageText
+                        parts={message.parts}
+                        isStreamingMessage={isStreamingMessage}
+                      />
                     )}
                   </div>
                 )}
@@ -262,8 +321,8 @@ export function PlannerChat({
           );
         })}
 
-        {status === "submitted" && (
-          <p className="text-xs text-muted-foreground">Thinking…</p>
+        {showAssistantStatus && (
+          <ChatAssistantStatus messages={messages} isBusy={isBusy} />
         )}
 
         {error && (

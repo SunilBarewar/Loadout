@@ -1,4 +1,5 @@
 import {
+  createUIMessageStream,
   createUIMessageStreamResponse,
   toUIMessageStream,
   type UIMessage,
@@ -23,6 +24,7 @@ import { getPlanSummaryForContext } from "@/features/plans/repository";
 import {
   assembleChatParts,
   findProposedDraft,
+  streamChunksFromToolResults,
 } from "@/features/ui-registry/mappers/assemble-parts";
 
 export const maxDuration = 60;
@@ -65,102 +67,124 @@ export async function POST(req: Request) {
   }
 
   const latestClientUserText = extractLatestUserMessageText(clientMessages);
-  if (latestClientUserText) {
-    const lastUserMessage = [...clientMessages]
-      .reverse()
-      .find((message) => message.role === "user");
+  const lastUserMessage = [...clientMessages]
+    .reverse()
+    .find((message) => message.role === "user");
 
-    await insertUserMessage({
-      clientMessageId: lastUserMessage?.id,
-      threadId,
-      userId: user.id,
-      content: latestClientUserText,
-    });
-  }
+  const stream = createUIMessageStream({
+    originalMessages: clientMessages,
+    execute: async ({ writer }) => {
+      if (latestClientUserText) {
+        await insertUserMessage({
+          clientMessageId: lastUserMessage?.id,
+          threadId,
+          userId: user.id,
+          content: latestClientUserText,
+        });
+      }
 
-  const profileBundle = await getUserProfileWithEquipment(user.id);
-  if (!profileBundle) {
-    return new Response("User profile not found", { status: 404 });
-  }
+      const [profileBundle, dbMessages] = await Promise.all([
+        getUserProfileWithEquipment(user.id),
+        getThreadMessages(threadId, user.id, 20),
+      ]);
 
-  const dbMessages = await getThreadMessages(threadId, user.id, 20);
-  const uiMessages = storedMessagesToUIMessages(dbMessages);
-  const latestUserMessage = extractLatestUserMessageText(uiMessages);
+      if (!profileBundle) {
+        throw new Error("User profile not found");
+      }
 
-  if (
-    latestUserMessage &&
-    detectSkipRemainingSlots(latestUserMessage) &&
-    !thread.planningFacts?.skipRemainingSlots
-  ) {
-    await mergeThreadPlanningFacts(threadId, user.id, {
-      skipRemainingSlots: true,
-    });
-  }
+      const uiMessages = storedMessagesToUIMessages(dbMessages);
+      const latestUserMessage = extractLatestUserMessageText(uiMessages);
 
-  const refreshedThread = await getChatThreadById(threadId, user.id);
-  const relatedPlanId =
-    refreshedThread?.relatedPlanId ?? thread.relatedPlanId ?? null;
-  const activePlanSummary =
-    relatedPlanId
-      ? await getPlanSummaryForContext(relatedPlanId, user.id)
-      : null;
+      if (
+        latestUserMessage &&
+        detectSkipRemainingSlots(latestUserMessage) &&
+        !thread.planningFacts?.skipRemainingSlots
+      ) {
+        await mergeThreadPlanningFacts(threadId, user.id, {
+          skipRemainingSlots: true,
+        });
+      }
 
-  const planningContext = buildPlanningContext({
-    purpose: thread.purpose,
-    relatedPlanId,
-    activePlanSummary,
-    profile: profileBundle.profile,
-    equipmentSlugs: profileBundle.equipmentSlugs,
-    equipmentCatalog: profileBundle.equipmentCatalog,
-    threadFacts: refreshedThread?.planningFacts ?? thread.planningFacts,
-    latestUserMessage,
-  });
+      const refreshedThread = await getChatThreadById(threadId, user.id);
+      const relatedPlanId =
+        refreshedThread?.relatedPlanId ?? thread.relatedPlanId ?? null;
+      const activePlanSummary = relatedPlanId
+        ? await getPlanSummaryForContext(relatedPlanId, user.id)
+        : null;
 
-  const result = await createCoachStream({
-    threadId,
-    purpose: thread.purpose,
-    planningContext,
-    messages: uiMessages,
-    onFinish: async (event) => {
-      const text = event.steps
-        .map((step) => step.text)
-        .filter(Boolean)
-        .join("\n\n")
-        .trim();
+      const planningContext = buildPlanningContext({
+        purpose: thread.purpose,
+        relatedPlanId,
+        activePlanSummary,
+        profile: profileBundle.profile,
+        equipmentSlugs: profileBundle.equipmentSlugs,
+        equipmentCatalog: profileBundle.equipmentCatalog,
+        threadFacts: refreshedThread?.planningFacts ?? thread.planningFacts,
+        latestUserMessage,
+      });
 
-      const toolResults = event.steps.flatMap((step) =>
-        step.toolResults.map((toolResult) => ({
-          toolName: toolResult.toolName,
-          output: toolResult.output,
-        }))
+      const result = await createCoachStream({
+        threadId,
+        purpose: thread.purpose,
+        planningContext,
+        messages: uiMessages,
+        onStepEnd: (step) => {
+          const toolResults = step.toolResults.map((toolResult) => ({
+            toolName: toolResult.toolName,
+            output: toolResult.output,
+          }));
+
+          for (const chunk of streamChunksFromToolResults(toolResults)) {
+            writer.write(chunk);
+          }
+        },
+        onFinish: async (event) => {
+          const text = event.steps
+            .map((step) => step.text)
+            .filter(Boolean)
+            .join("\n\n")
+            .trim();
+
+          const toolResults = event.steps.flatMap((step) =>
+            step.toolResults.map((toolResult) => ({
+              toolName: toolResult.toolName,
+              output: toolResult.output,
+            }))
+          );
+          const parts = assembleChatParts({ text, toolResults });
+          const proposed = findProposedDraft(toolResults);
+
+          if (parts.length > 0) {
+            await insertAssistantMessage({
+              threadId,
+              userId: user.id,
+              content: text,
+              model: COACH_MODEL,
+              customParts: parts,
+            });
+          } else if (text) {
+            await insertAssistantMessage({
+              threadId,
+              userId: user.id,
+              content: text,
+              model: COACH_MODEL,
+            });
+          }
+
+          if (proposed) {
+            await setThreadRelatedPlanId(threadId, user.id, proposed.planId);
+          }
+        },
+      });
+
+      writer.merge(
+        toUIMessageStream({
+          stream: result.stream,
+          originalMessages: uiMessages,
+        })
       );
-      const parts = assembleChatParts({ text, toolResults });
-      const proposed = findProposedDraft(toolResults);
-
-      if (parts.length > 0) {
-        await insertAssistantMessage({
-          threadId,
-          userId: user.id,
-          content: text,
-          model: COACH_MODEL,
-          customParts: parts,
-        });
-      } else if (text) {
-        await insertAssistantMessage({
-          threadId,
-          userId: user.id,
-          content: text,
-          model: COACH_MODEL,
-        });
-      }
-
-      if (proposed) {
-        await setThreadRelatedPlanId(threadId, user.id, proposed.planId);
-      }
     },
   });
 
-  return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
-  });
+  return createUIMessageStreamResponse({ stream });
 }

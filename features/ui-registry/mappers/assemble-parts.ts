@@ -133,3 +133,21 @@ export function assembleChatParts(params: {
 
   return parseChatParts(parts);
 }
+
+export type RegistryDataStreamChunk = {
+  type: `data-${StoredChatPart["type"]}`;
+  id: string;
+  data: StoredChatPart["data"];
+};
+
+export function streamChunksFromToolResults(
+  toolResults: ToolResultForAssembly[]
+): RegistryDataStreamChunk[] {
+  return assembleChatParts({ text: "", toolResults })
+    .filter((part): part is StoredChatPart => part.type !== "text")
+    .map((part) => ({
+      type: `data-${part.type}` as RegistryDataStreamChunk["type"],
+      id: part.id,
+      data: part.data,
+    }));
+}
