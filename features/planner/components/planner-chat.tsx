@@ -8,10 +8,10 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   ArrowLeft,
   ArrowUp,
-  Bot,
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
+import { MarkdownContent } from "@/features/planner/components/markdown-content";
 import { ChatPartRenderer } from "@/features/ui-registry";
 import type { StoredChatPart } from "@/features/ui-registry";
 import { cn } from "@/lib/utils";
@@ -163,32 +163,36 @@ export function PlannerChat({
             <div
               key={message.id}
               className={cn(
-                "flex flex-col gap-1.5 max-w-3xl",
-                isUser ? "ml-auto items-end" : "mr-auto items-start"
+                "flex flex-col gap-3",
+                isUser
+                  ? "ml-auto max-w-[85%] items-end"
+                  : "mr-auto w-full max-w-3xl items-start"
               )}
             >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-                {!isUser && (
-                  <div className="size-5 rounded bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
-                    <Bot className="size-3" />
-                  </div>
+              <div
+                className={cn(
+                  "flex flex-col gap-3",
+                  isUser ? "items-end" : "w-full"
                 )}
-                <span className="font-semibold text-foreground/80">
-                  {isUser ? "You" : "Loadout AI"}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-3 w-full">
+              >
                 {(text || (message.role === "assistant" && isBusy && !dataParts.length)) && (
                   <div
                     className={cn(
-                      "p-4 rounded-md text-sm leading-relaxed border whitespace-pre-wrap",
+                      "rounded-md border p-4 text-sm leading-relaxed",
                       isUser
-                        ? "bg-primary text-primary-foreground border-primary font-medium shadow-xs"
-                        : "bg-card text-foreground border-border"
+                        ? "w-fit max-w-full bg-primary font-medium text-primary-foreground border-primary shadow-xs whitespace-pre-wrap"
+                        : "w-full bg-card text-foreground border-border"
                     )}
                   >
-                    {text || (status === "streaming" ? "…" : "")}
+                    {isUser ? (
+                      text || (status === "streaming" ? "…" : "")
+                    ) : text ? (
+                      <MarkdownContent content={text} />
+                    ) : status === "streaming" ? (
+                      "…"
+                    ) : (
+                      ""
+                    )}
                   </div>
                 )}
 
