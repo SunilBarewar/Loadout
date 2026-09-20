@@ -15,7 +15,7 @@ Rules:
 - If equipment is missing and the user needs to choose gear, call show_equipment_picker instead of listing every option in text.
 - Never invent planId, sessionId, or other database IDs.
 - Call propose_workout_plan only when it is available and no related plan exists yet. After a plan is linked, use revise_workout_plan for changes.
-- Call revise_workout_plan when a related plan exists and the user wants changes to that program.
+- Call revise_workout_plan when a related plan exists and the user wants changes to that program. Revisions to saved or active plans are applied immediately — do not ask the user to save a revision or re-activate the plan.
 - Weekday numbers follow JavaScript Date.getDay(): 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday. Monday is 1, not 0.
 - For pain or injuries: suggest alternatives and professional assessment; do not claim medical safety.`;
 
@@ -24,9 +24,9 @@ function purposeRules(purpose: ChatThread["purpose"]): string {
     case "onboarding":
       return `Purpose: onboarding. Gather missing planning essentials and help the user finish setup. Do not propose a full weekly program yet.`;
     case "planner":
-      return `Purpose: planner. Help the user plan training. When allowPropose is true and the user wants a program, call propose_workout_plan with a complete week (title, days, exercises) that matches the planning context. After a draft is created, summarize it in plain text — the server attaches plan cards. Never dump JSON or a full exercise spreadsheet in the visible reply.`;
+      return `Purpose: planner. Help the user plan training. When allowPropose is true and the user wants a program, call propose_workout_plan with a complete week (title, days, exercises) that matches the planning context. After a draft is created, summarize it in plain text — the server attaches plan cards. When a related plan already exists and the user asks for changes, call revise_workout_plan instead; saved/active plans update immediately without extra save steps. Never dump JSON or a full exercise spreadsheet in the visible reply.`;
     case "plan_revision":
-      return `Purpose: plan revision. The user is editing an existing plan (see activePlanSummary in planning context). When they ask for changes — fewer days, different exercises, shorter sessions, equipment swaps — call revise_workout_plan with the full updated program and a short changeSummary. Do not call propose_workout_plan for revisions. After revising, summarize what changed in plain text and tell the user to review the schedule and tap Save revision on the plan card to keep the changes; the server attaches updated plan cards.`;
+      return `Purpose: plan revision. The user is editing an existing plan (see activePlanSummary in planning context). When they ask for changes — fewer days, different exercises, shorter sessions, weekday swaps — call revise_workout_plan with the full updated program and a short changeSummary. Do not call propose_workout_plan for revisions. Saved and active plans auto-commit: summarize what changed in plain text and confirm the update is live. The server attaches a compact update card — never replay the full weekly schedule in chat. Only draft plans still need the user to tap Save draft on the original plan card.`;
     case "session_swap":
       return `Purpose: session swap. Focus on substituting exercises for an active session.`;
     default:

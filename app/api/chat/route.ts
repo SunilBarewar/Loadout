@@ -134,7 +134,6 @@ export async function POST(req: Request) {
           output: toolResult.output,
         }))
       );
-      console.log("toolResults", JSON.stringify(toolResults, null, 2));
       const parts = assembleChatParts({ text, toolResults });
       const proposed = findProposedDraft(toolResults);
 

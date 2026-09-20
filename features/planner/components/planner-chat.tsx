@@ -45,7 +45,8 @@ function dataPartToStoredPart(
   if (
     registryType !== "equipment_picker" &&
     registryType !== "workout_plan" &&
-    registryType !== "weekly_schedule"
+    registryType !== "weekly_schedule" &&
+    registryType !== "plan_update"
   ) {
     return null;
   }
@@ -62,6 +63,46 @@ function hasRenderableContent(parts: UIMessage["parts"]) {
   const text = messageText(parts);
   if (text) return true;
   return parts.some(isDataRegistryPart);
+}
+
+function getDataPartPlanId(part: UIMessage["parts"][number]): string | null {
+  if (!isDataRegistryPart(part)) return null;
+  const data = part.data as { planId?: string };
+  return typeof data.planId === "string" ? data.planId : null;
+}
+
+function buildScheduleVisibility(messages: UIMessage[]) {
+  const firstWeeklyScheduleMessageByPlan = new Map<string, string>();
+
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type !== "data-weekly_schedule") continue;
+      const planId = getDataPartPlanId(part);
+      if (!planId || firstWeeklyScheduleMessageByPlan.has(planId)) continue;
+      firstWeeklyScheduleMessageByPlan.set(planId, message.id);
+    }
+  }
+
+  return firstWeeklyScheduleMessageByPlan;
+}
+
+function shouldRenderDataPart(
+  part: UIMessage["parts"][number] & { type: `data-${string}`; data: unknown; id?: string },
+  messageId: string,
+  scheduleVisibility: Map<string, string>
+) {
+  if (part.type === "data-weekly_schedule") {
+    const planId = getDataPartPlanId(part);
+    if (!planId) return true;
+    return scheduleVisibility.get(planId) === messageId;
+  }
+
+  if (part.type === "data-workout_plan") {
+    const data = part.data as { isRevision?: boolean };
+    if (data.isRevision) return false;
+  }
+
+  return true;
 }
 
 export function PlannerChat({
@@ -97,6 +138,7 @@ export function PlannerChat({
   }, [messages, status]);
 
   const isBusy = status === "submitted" || status === "streaming";
+  const scheduleVisibility = buildScheduleVisibility(messages);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +240,12 @@ export function PlannerChat({
 
                 {!isUser &&
                   dataParts.map((part, index) => {
+                    if (
+                      !shouldRenderDataPart(part, message.id, scheduleVisibility)
+                    ) {
+                      return null;
+                    }
+
                     const storedPart = dataPartToStoredPart(part);
                     if (!storedPart) return null;
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { textPartDataSchema } from "./text";
 import { equipmentPickerPartDataSchema } from "./equipment-picker";
+import { planUpdatePartDataSchema } from "./plan-update";
 import { workoutPlanPartDataSchema } from "./workout-plan";
 import { weeklySchedulePartDataSchema } from "./weekly-schedule";
 
@@ -33,11 +34,18 @@ export const weeklyScheduleChatPartSchema = z.object({
   data: weeklySchedulePartDataSchema,
 });
 
+export const planUpdateChatPartSchema = z.object({
+  ...chatPartEnvelopeBase,
+  type: z.literal("plan_update"),
+  data: planUpdatePartDataSchema,
+});
+
 export const chatPartSchema = z.discriminatedUnion("type", [
   textChatPartSchema,
   equipmentPickerChatPartSchema,
   workoutPlanChatPartSchema,
   weeklyScheduleChatPartSchema,
+  planUpdateChatPartSchema,
 ]);
 
 export type StoredChatPart = z.infer<typeof chatPartSchema>;

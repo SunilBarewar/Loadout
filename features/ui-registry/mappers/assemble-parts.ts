@@ -18,6 +18,27 @@ function isPlanToolSuccess(output: unknown): output is PlanToolSuccess {
   return value.ok === true && typeof value.planId === "string";
 }
 
+function buildPlanUpdatePart(
+  revision: PlanToolSuccess & {
+    changeSummary: string;
+    autoCommitted: boolean;
+  }
+): StoredChatPart {
+  return {
+    id: crypto.randomUUID(),
+    type: "plan_update",
+    schemaVersion: 1,
+    data: {
+      planId: revision.planId,
+      versionId: revision.versionId,
+      title: revision.title,
+      changeSummary: revision.changeSummary,
+      state: revision.state,
+      autoCommitted: revision.autoCommitted,
+    },
+  };
+}
+
 function buildPlanCardParts(
   draft: PlanToolSuccess,
   options?: { isRevision?: boolean }
@@ -102,7 +123,11 @@ export function assembleChatParts(params: {
       result.toolName === "revise_workout_plan" &&
       isPlanToolSuccess(result.output)
     ) {
-      parts.push(...buildPlanCardParts(result.output, { isRevision: true }));
+      const revision = result.output as PlanToolSuccess & {
+        changeSummary: string;
+        autoCommitted: boolean;
+      };
+      parts.push(buildPlanUpdatePart(revision));
     }
   }
 

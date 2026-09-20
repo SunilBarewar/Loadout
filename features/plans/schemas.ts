@@ -156,6 +156,8 @@ export type PlanCardState = "draft" | "saved" | "active";
 
 export type InsertedPlanRevision = Omit<InsertedDraftPlan, "state"> & {
   state: PlanCardState;
+  changeSummary: string;
+  autoCommitted: boolean;
 };
 
 export type ReviseWorkoutPlanResult =

@@ -443,9 +443,22 @@ export async function insertPlanRevision(params: {
     catalogSlugs,
   });
 
-  // Always point at the new version so plan views and cards stay in sync.
-  // Saved/active plans revert to draft until the user saves the revision.
-  const wasCommitted = plan.status === "saved" || plan.status === "active";
+  // Active and saved plans auto-commit revisions so chat edits apply immediately.
+  const previousStatus = plan.status;
+  const autoCommitted =
+    previousStatus === "saved" || previousStatus === "active";
+
+  if (previousStatus === "active") {
+    const weekdayResult = await ensurePlanDaysHaveWeekdays({
+      versionId: version.id,
+      daysPerWeek: params.domain.daysPerWeek,
+    });
+    if (!weekdayResult.ok) {
+      throw new PlanCompilerError(weekdayResult.error);
+    }
+  }
+
+  const nextStatus = autoCommitted ? previousStatus : "draft";
 
   await db
     .update(workoutPlans)
@@ -454,7 +467,7 @@ export async function insertPlanRevision(params: {
       goal: params.domain.goal,
       daysPerWeek: params.domain.daysPerWeek,
       activeVersionId: version.id,
-      ...(wasCommitted ? { status: "draft" } : {}),
+      status: nextStatus,
       updatedAt: new Date(),
     })
     .where(eq(workoutPlans.id, plan.id));
@@ -462,7 +475,7 @@ export async function insertPlanRevision(params: {
   return {
     planId: plan.id,
     versionId: version.id,
-    state: wasCommitted ? "draft" : planStatusToCardState(plan.status),
+    state: planStatusToCardState(nextStatus),
     title: params.domain.title,
     goal: params.domain.goal,
     daysPerWeek: params.domain.daysPerWeek,
@@ -470,6 +483,8 @@ export async function insertPlanRevision(params: {
     estimatedWeeklyMinutes,
     schedulingMode: params.domain.schedulingMode,
     days,
+    changeSummary: params.domain.changeSummary,
+    autoCommitted,
   };
 }
 
