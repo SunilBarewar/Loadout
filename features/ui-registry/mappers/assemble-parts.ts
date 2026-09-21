@@ -105,7 +105,11 @@ export function assembleChatParts(params: {
   }
 
   for (const result of params.toolResults) {
-    if (result.toolName === "show_equipment_picker") {
+    if (
+      result.toolName === "show_equipment_picker" ||
+      result.toolName === "suggest_exercise_alternatives" ||
+      result.toolName === "show_progress_snapshot"
+    ) {
       const output = result.output as { uiPart?: StoredChatPart } | undefined;
       if (output?.uiPart) {
         parts.push(output.uiPart);

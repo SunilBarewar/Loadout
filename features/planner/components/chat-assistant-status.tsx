@@ -9,6 +9,8 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   revise_workout_plan: "Updating your plan",
   show_equipment_picker: "Preparing equipment picker",
   save_planning_facts: "Saving your preferences",
+  suggest_exercise_alternatives: "Finding swap options",
+  show_progress_snapshot: "Reviewing your training history",
 };
 
 type ToolInvocationPart = Extract<

@@ -6,6 +6,8 @@ export { EquipmentPickerCard } from "./components/equipment-picker-card";
 export { PlanUpdateCard } from "./components/plan-update-card";
 export { WorkoutPlanCard } from "./components/workout-plan-card";
 export { WeeklyScheduleGrid } from "./components/weekly-schedule-grid";
+export { ExerciseCarouselCard } from "./components/exercise-carousel-card";
+export { ProgressSnapshotCard } from "./components/progress-snapshot-card";
 
 export {
   chatPartSchema,
@@ -40,3 +42,5 @@ export type { EquipmentPickerPartData } from "./schemas/equipment-picker";
 export type { PlanUpdatePartData } from "./schemas/plan-update";
 export type { WorkoutPlanPartData } from "./schemas/workout-plan";
 export type { WeeklySchedulePartData } from "./schemas/weekly-schedule";
+export type { ExerciseCarouselPartData } from "./schemas/exercise-carousel";
+export type { ProgressSnapshotPartData } from "./schemas/progress-snapshot";

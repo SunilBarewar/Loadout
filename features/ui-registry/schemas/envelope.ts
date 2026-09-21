@@ -4,6 +4,8 @@ import { equipmentPickerPartDataSchema } from "./equipment-picker";
 import { planUpdatePartDataSchema } from "./plan-update";
 import { workoutPlanPartDataSchema } from "./workout-plan";
 import { weeklySchedulePartDataSchema } from "./weekly-schedule";
+import { exerciseCarouselPartDataSchema } from "./exercise-carousel";
+import { progressSnapshotPartDataSchema } from "./progress-snapshot";
 
 const chatPartEnvelopeBase = {
   id: z.string().uuid(),
@@ -40,12 +42,26 @@ export const planUpdateChatPartSchema = z.object({
   data: planUpdatePartDataSchema,
 });
 
+export const exerciseCarouselChatPartSchema = z.object({
+  ...chatPartEnvelopeBase,
+  type: z.literal("exercise_carousel"),
+  data: exerciseCarouselPartDataSchema,
+});
+
+export const progressSnapshotChatPartSchema = z.object({
+  ...chatPartEnvelopeBase,
+  type: z.literal("progress_snapshot"),
+  data: progressSnapshotPartDataSchema,
+});
+
 export const chatPartSchema = z.discriminatedUnion("type", [
   textChatPartSchema,
   equipmentPickerChatPartSchema,
   workoutPlanChatPartSchema,
   weeklyScheduleChatPartSchema,
   planUpdateChatPartSchema,
+  exerciseCarouselChatPartSchema,
+  progressSnapshotChatPartSchema,
 ]);
 
 export type StoredChatPart = z.infer<typeof chatPartSchema>;

@@ -7,6 +7,7 @@ import {
   mergeThreadPlanningFacts,
 } from "@/features/planner/repository";
 import type { ChatThreadItem } from "@/features/planner/types";
+import { buildSessionSwapInitialPrompt } from "@/features/planner/session-swap-prompt";
 
 export type SaveUserEquipmentResult =
   | { ok: true; slugs: string[] }
@@ -35,6 +36,66 @@ export async function saveUserEquipmentSelectionAction(
   });
 
   return { ok: true, slugs: validSlugs };
+}
+
+export async function createSessionSwapThreadAction(params: {
+  sessionId: string;
+  sessionExerciseId: string;
+  reason?: string;
+}): Promise<
+  | { ok: true; threadId: string; initialPrompt: string }
+  | { ok: false; error: string }
+> {
+  const user = await ensureCurrentUser();
+  if (!user) {
+    return { ok: false, error: "You must be signed in." };
+  }
+
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (
+    !uuidPattern.test(params.sessionId) ||
+    !uuidPattern.test(params.sessionExerciseId)
+  ) {
+    return { ok: false, error: "Invalid session or exercise." };
+  }
+
+  const { getSessionWithExercises } = await import(
+    "@/features/sessions/repository"
+  );
+  const loaded = await getSessionWithExercises(params.sessionId, user.id);
+
+  if (!loaded || !["active", "paused"].includes(loaded.session.status)) {
+    return { ok: false, error: "Session is not active." };
+  }
+
+  const exercise = loaded.exercises.find(
+    (item) => item.id === params.sessionExerciseId
+  );
+
+  if (
+    !exercise ||
+    ["completed", "skipped", "replaced"].includes(exercise.status)
+  ) {
+    return { ok: false, error: "Exercise cannot be swapped." };
+  }
+
+  const thread = await createChatThread({
+    userId: user.id,
+    purpose: "session_swap",
+    relatedSessionId: params.sessionId,
+    title: `Swap ${exercise.nameSnapshot.slice(0, 40)}`,
+  });
+
+  return {
+    ok: true,
+    threadId: thread.id,
+    initialPrompt: buildSessionSwapInitialPrompt({
+      exerciseName: exercise.nameSnapshot,
+      reason: params.reason,
+    }),
+  };
 }
 
 export async function createPlannerThreadAction(initialPrompt?: string): Promise<string> {

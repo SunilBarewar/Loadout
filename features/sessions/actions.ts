@@ -389,6 +389,27 @@ export async function skipExerciseAction(input: {
   return { ok: true };
 }
 
+export async function applyExerciseSwapFromChatAction(input: {
+  sessionId: string;
+  sessionExerciseId: string;
+  exerciseName: string;
+  reason?: string | null;
+  threadId?: string;
+}): Promise<SessionMutationResult> {
+  const result = await replaceExerciseAction({
+    sessionId: input.sessionId,
+    sessionExerciseId: input.sessionExerciseId,
+    name: input.exerciseName,
+    reason: input.reason,
+  });
+
+  if (result.ok && input.threadId) {
+    revalidatePath(`/planner/${input.threadId}`);
+  }
+
+  return result;
+}
+
 export async function replaceExerciseAction(input: {
   sessionId: string;
   sessionExerciseId: string;

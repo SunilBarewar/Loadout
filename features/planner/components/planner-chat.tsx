@@ -47,7 +47,9 @@ function dataPartToStoredPart(
     registryType !== "equipment_picker" &&
     registryType !== "workout_plan" &&
     registryType !== "weekly_schedule" &&
-    registryType !== "plan_update"
+    registryType !== "plan_update" &&
+    registryType !== "exercise_carousel" &&
+    registryType !== "progress_snapshot"
   ) {
     return null;
   }

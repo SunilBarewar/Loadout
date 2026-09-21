@@ -5,11 +5,15 @@ import { EquipmentPickerCard } from "./components/equipment-picker-card";
 import { PlanUpdateCard } from "./components/plan-update-card";
 import { WorkoutPlanCard } from "./components/workout-plan-card";
 import { WeeklyScheduleGrid } from "./components/weekly-schedule-grid";
+import { ExerciseCarouselCard } from "./components/exercise-carousel-card";
+import { ProgressSnapshotCard } from "./components/progress-snapshot-card";
 import { textPartDataSchema } from "./schemas/text";
 import { equipmentPickerPartDataSchema } from "./schemas/equipment-picker";
 import { planUpdatePartDataSchema } from "./schemas/plan-update";
 import { workoutPlanPartDataSchema } from "./schemas/workout-plan";
 import { weeklySchedulePartDataSchema } from "./schemas/weekly-schedule";
+import { exerciseCarouselPartDataSchema } from "./schemas/exercise-carousel";
+import { progressSnapshotPartDataSchema } from "./schemas/progress-snapshot";
 import type { ChatPartType } from "./schemas/envelope";
 
 type RegistryEntry = {
@@ -37,5 +41,13 @@ export const uiRegistry: Record<ChatPartType, RegistryEntry> = {
   plan_update: {
     schema: planUpdatePartDataSchema,
     component: PlanUpdateCard as ComponentType<{ data: unknown }>,
+  },
+  exercise_carousel: {
+    schema: exerciseCarouselPartDataSchema,
+    component: ExerciseCarouselCard as ComponentType<{ data: unknown }>,
+  },
+  progress_snapshot: {
+    schema: progressSnapshotPartDataSchema,
+    component: ProgressSnapshotCard as ComponentType<{ data: unknown }>,
   },
 };

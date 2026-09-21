@@ -10,8 +10,10 @@ import {
   ChevronRight,
   MoreHorizontal,
   SkipForward,
+  Sparkles,
   X,
 } from "lucide-react";
+import { createSessionSwapThreadAction } from "@/features/planner/actions";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -88,6 +90,7 @@ export function SessionWorkout({ data }: SessionWorkoutProps) {
   const [exerciseNotes, setExerciseNotes] = useState("");
   const [replacementName, setReplacementName] = useState("");
   const [replacementReason, setReplacementReason] = useState("");
+  const [isOpeningCoachSwap, startCoachSwapTransition] = useTransition();
 
   const { session, exercises, setLogsByExerciseId } = data;
   const isLive = session.status === "active" || session.status === "paused";
@@ -203,6 +206,31 @@ export function SessionWorkout({ data }: SessionWorkoutProps) {
         orderedExerciseIds: nextOrder.map((exercise) => exercise.id),
       })
     );
+  }
+
+  function handleAskCoachForSwap() {
+    if (!currentExercise) {
+      return;
+    }
+
+    setError(null);
+    startCoachSwapTransition(async () => {
+      const result = await createSessionSwapThreadAction({
+        sessionId: session.id,
+        sessionExerciseId: currentExercise.id,
+        reason: replacementReason.trim() || undefined,
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        initialPrompt: result.initialPrompt,
+      });
+      router.push(`/planner/${result.threadId}?${params.toString()}`);
+    });
   }
 
   function handleExerciseAction() {
@@ -328,6 +356,17 @@ export function SessionWorkout({ data }: SessionWorkoutProps) {
                   className="text-xs"
                 >
                   Replace
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending || isOpeningCoachSwap}
+                  onClick={handleAskCoachForSwap}
+                  className="text-xs"
+                >
+                  <Sparkles className="size-3.5" />
+                  Ask coach
                 </Button>
               </div>
             )}

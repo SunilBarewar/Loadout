@@ -11,6 +11,7 @@ import {
   extractPlanIdsFromMessages,
   hydrateStoredMessages,
 } from "@/features/ui-registry/mappers/hydrate-stored-parts";
+import { getExerciseCarouselSwapStates } from "@/features/ui-registry/mappers/get-exercise-carousel-swap-states";
 
 interface PlannerThreadPageProps {
   params: Promise<{ threadId: string }>;
@@ -41,12 +42,16 @@ export default async function PlannerThreadPage({
   }
 
   const dbMessages = await getThreadMessages(threadId, user.id);
-  const planIds = extractPlanIdsFromMessages(dbMessages);
+  const [planIds, exerciseCarouselSwapStates] = await Promise.all([
+    Promise.resolve(extractPlanIdsFromMessages(dbMessages)),
+    getExerciseCarouselSwapStates(dbMessages, user.id),
+  ]);
   const planStates = await getPlanStatusesForUser(user.id, planIds);
   const hydratedMessages = hydrateStoredMessages(dbMessages, {
     equipmentCatalog: profileBundle.equipmentCatalog,
     equipmentSlugs: profileBundle.equipmentSlugs,
     planStates,
+    exerciseCarouselSwapStates,
   });
   const initialMessages = storedMessagesToUIMessages(hydratedMessages);
 

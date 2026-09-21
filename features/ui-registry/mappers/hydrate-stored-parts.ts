@@ -8,11 +8,16 @@ import {
   type StoredChatPart,
 } from "../schemas/envelope";
 import { buildEquipmentPickerData } from "./equipment-picker-data";
+import {
+  hydrateExerciseCarouselPart,
+  type ExerciseCarouselSwapKey,
+} from "./exercise-carousel-hydration";
 
 export type StoredPartsHydrationContext = {
   equipmentCatalog: Equipment[];
   equipmentSlugs: string[];
   planStates?: Map<string, PlanCardState>;
+  exerciseCarouselSwapStates?: Map<ExerciseCarouselSwapKey, string>;
 };
 
 function hydrateEquipmentPickerPart(
@@ -101,6 +106,15 @@ export function hydrateStoredParts(
 
     if (part.type === "plan_update") {
       return hydratePlanUpdatePart(part, context);
+    }
+
+    if (part.type === "exercise_carousel") {
+      const swapKey =
+        `${part.data.sessionId}:${part.data.sessionExerciseId}` as ExerciseCarouselSwapKey;
+      return hydrateExerciseCarouselPart(
+        part,
+        context.exerciseCarouselSwapStates?.get(swapKey)
+      );
     }
 
     return part;
