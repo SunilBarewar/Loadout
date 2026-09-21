@@ -13,13 +13,22 @@ import {
 } from "@/features/ai";
 import {
   getChatThreadById,
-  getThreadMessages,
+  getCoachConversationMessages,
   insertAssistantMessage,
   insertUserMessage,
   mergeThreadPlanningFacts,
   setThreadRelatedPlanId,
   storedMessagesToUIMessages,
+  updateThreadSummary,
 } from "@/features/planner/repository";
+import {
+  getSessionContextForCoach,
+  getTrainingSummaryForUser,
+} from "@/features/ai/training-context";
+import {
+  shouldSummarizeThread,
+  summarizeThreadMessages,
+} from "@/features/ai/thread-summary";
 import { getPlanSummaryForContext } from "@/features/plans/repository";
 import {
   assembleChatParts,
@@ -83,16 +92,33 @@ export async function POST(req: Request) {
         });
       }
 
-      const [profileBundle, dbMessages] = await Promise.all([
-        getUserProfileWithEquipment(user.id),
-        getThreadMessages(threadId, user.id, 20),
-      ]);
-
+      const profileBundle = await getUserProfileWithEquipment(user.id);
       if (!profileBundle) {
         throw new Error("User profile not found");
       }
 
-      const uiMessages = storedMessagesToUIMessages(dbMessages);
+      let coachConversation = await getCoachConversationMessages(
+        threadId,
+        user.id
+      );
+
+      if (
+        coachConversation.messagesToSummarize.length > 0 &&
+        shouldSummarizeThread(
+          coachConversation.messages.length +
+            coachConversation.messagesToSummarize.length
+        )
+      ) {
+        const refreshedThread = await getChatThreadById(threadId, user.id);
+        const nextSummary = await summarizeThreadMessages(
+          coachConversation.messagesToSummarize,
+          refreshedThread?.summary ?? coachConversation.summary
+        );
+        await updateThreadSummary(threadId, user.id, nextSummary);
+        coachConversation = await getCoachConversationMessages(threadId, user.id);
+      }
+
+      const uiMessages = storedMessagesToUIMessages(coachConversation.messages);
       const latestUserMessage = extractLatestUserMessageText(uiMessages);
 
       if (
@@ -108,14 +134,31 @@ export async function POST(req: Request) {
       const refreshedThread = await getChatThreadById(threadId, user.id);
       const relatedPlanId =
         refreshedThread?.relatedPlanId ?? thread.relatedPlanId ?? null;
-      const activePlanSummary = relatedPlanId
-        ? await getPlanSummaryForContext(relatedPlanId, user.id)
-        : null;
+      const relatedSessionId =
+        refreshedThread?.relatedSessionId ?? thread.relatedSessionId ?? null;
+
+      const [activePlanSummary, trainingSummary, sessionContext] =
+        await Promise.all([
+          relatedPlanId
+            ? getPlanSummaryForContext(relatedPlanId, user.id)
+            : Promise.resolve(null),
+          getTrainingSummaryForUser(
+            user.id,
+            profileBundle.profile.weightUnit
+          ),
+          relatedSessionId
+            ? getSessionContextForCoach(relatedSessionId, user.id)
+            : Promise.resolve(null),
+        ]);
 
       const planningContext = buildPlanningContext({
         purpose: thread.purpose,
         relatedPlanId,
+        relatedSessionId,
         activePlanSummary,
+        trainingSummary,
+        sessionContext,
+        threadSummary: coachConversation.summary?.content ?? null,
         profile: profileBundle.profile,
         equipmentSlugs: profileBundle.equipmentSlugs,
         equipmentCatalog: profileBundle.equipmentCatalog,

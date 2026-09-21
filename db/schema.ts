@@ -453,6 +453,13 @@ export type ThreadPlanningFacts = {
   skipRemainingSlots?: boolean;
 };
 
+export type ThreadSummary = {
+  content: string;
+  summarizedMessageCount: number;
+  lastSummarizedMessageId: string | null;
+  updatedAt: string;
+};
+
 export const chatThreads = pgTable("chat_threads", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id")
@@ -467,6 +474,7 @@ export const chatThreads = pgTable("chat_threads", {
     { onDelete: "set null" }
   ),
   planningFacts: jsonb("planning_facts").$type<ThreadPlanningFacts>(),
+  summary: jsonb("summary").$type<ThreadSummary>(),
   title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .defaultNow()

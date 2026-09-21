@@ -4,12 +4,16 @@ import { createProposeWorkoutPlanTool } from "./propose-workout-plan";
 import { createReviseWorkoutPlanTool } from "./revise-workout-plan";
 import { createSavePlanningFactsTool } from "./save-planning-facts";
 import { createShowEquipmentPickerTool } from "./show-equipment-picker";
+import { createSuggestExerciseAlternativesTool } from "./suggest-exercise-alternatives";
+import { createShowProgressSnapshotTool } from "./show-progress-snapshot";
 
 export type CoachToolName =
   | "save_planning_facts"
   | "show_equipment_picker"
   | "propose_workout_plan"
-  | "revise_workout_plan";
+  | "revise_workout_plan"
+  | "suggest_exercise_alternatives"
+  | "show_progress_snapshot";
 
 export function getAllowedCoachTools(
   context: PlanningContext
@@ -20,7 +24,16 @@ export function getAllowedCoachTools(
     tools.push("show_equipment_picker");
   }
 
-  if (context.relatedPlanId) {
+  if (
+    context.trainingSummary?.hasHistory &&
+    (context.purpose === "planner" || context.purpose === "plan_revision")
+  ) {
+    tools.push("show_progress_snapshot");
+  }
+
+  if (context.purpose === "session_swap" && context.sessionContext) {
+    tools.push("suggest_exercise_alternatives");
+  } else if (context.relatedPlanId) {
     tools.push("revise_workout_plan");
   } else if (context.purpose === "planner" && context.allowPropose) {
     tools.push("propose_workout_plan");
@@ -62,6 +75,18 @@ export function createCoachTools(params: {
   if (allowedTools.includes("revise_workout_plan")) {
     tools.revise_workout_plan = createReviseWorkoutPlanTool({
       userId: params.userId,
+      planningContext,
+    });
+  }
+
+  if (allowedTools.includes("suggest_exercise_alternatives")) {
+    tools.suggest_exercise_alternatives = createSuggestExerciseAlternativesTool({
+      planningContext,
+    });
+  }
+
+  if (allowedTools.includes("show_progress_snapshot")) {
+    tools.show_progress_snapshot = createShowProgressSnapshotTool({
       planningContext,
     });
   }

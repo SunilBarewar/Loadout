@@ -7,8 +7,13 @@ import {
   type ChatThread,
   type ChatMessage,
   type ThreadPlanningFacts,
+  type ThreadSummary,
 } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import {
+  COACH_MESSAGE_WINDOW,
+  selectMessagesForCoach,
+} from "@/features/ai/thread-summary";
 import type { StoredChatPart } from "@/features/ui-registry/schemas/envelope";
 import { storedMessagesToUIMessages } from "@/features/ui-registry/mappers/stored-to-ui";
 
@@ -267,6 +272,81 @@ export async function setThreadPurpose(
       ...(relatedPlanId ? { relatedPlanId } : {}),
       updatedAt: new Date(),
     })
+    .where(eq(chatThreads.id, threadId));
+}
+
+export async function getThreadMessageCount(
+  threadId: string,
+  userId: string
+): Promise<number> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return 0;
+  }
+
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId));
+
+  return result?.count ?? 0;
+}
+
+export async function getAllThreadMessages(
+  threadId: string,
+  userId: string
+): Promise<ChatMessage[]> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return [];
+  }
+
+  return db
+    .select()
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId))
+    .orderBy(asc(chatMessages.createdAt));
+}
+
+export async function getCoachConversationMessages(
+  threadId: string,
+  userId: string
+): Promise<{
+  summary: ThreadSummary | null;
+  messages: ChatMessage[];
+  messagesToSummarize: ChatMessage[];
+}> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return { summary: null, messages: [], messagesToSummarize: [] };
+  }
+
+  const allMessages = await getAllThreadMessages(threadId, userId);
+  const selected = selectMessagesForCoach({
+    messages: allMessages,
+    summary: thread.summary ?? null,
+  });
+
+  return {
+    summary: selected.summary,
+    messages: selected.recentMessages.slice(-COACH_MESSAGE_WINDOW),
+    messagesToSummarize: selected.messagesToSummarize,
+  };
+}
+
+export async function updateThreadSummary(
+  threadId: string,
+  userId: string,
+  summary: ThreadSummary
+): Promise<void> {
+  const thread = await getChatThreadById(threadId, userId);
+  if (!thread) {
+    return;
+  }
+
+  await db
+    .update(chatThreads)
+    .set({ summary, updatedAt: new Date() })
     .where(eq(chatThreads.id, threadId));
 }
 

@@ -17,7 +17,10 @@ Rules:
 - Call propose_workout_plan only when it is available and no related plan exists yet. After a plan is linked, use revise_workout_plan for changes.
 - Call revise_workout_plan when a related plan exists and the user wants changes to that program. Revisions to saved or active plans are applied immediately — do not ask the user to save a revision or re-activate the plan.
 - Weekday numbers follow JavaScript Date.getDay(): 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday. Monday is 1, not 0.
-- For pain or injuries: suggest alternatives and professional assessment; do not claim medical safety.`;
+- For pain or injuries: suggest alternatives and professional assessment; do not claim medical safety.
+- Use trainingSummary when present: reference recent sessions, volume trends, and progressiveOverloadHints when proposing or revising plans.
+- When the user asks about progress, adherence, or "how am I doing", call show_progress_snapshot if it is available.
+- For session_swap threads, use sessionContext.currentExercise.sessionExerciseId when calling suggest_exercise_alternatives. Do not invent session or exercise IDs.`;
 
 function purposeRules(purpose: ChatThread["purpose"]): string {
   switch (purpose) {
@@ -28,7 +31,7 @@ function purposeRules(purpose: ChatThread["purpose"]): string {
     case "plan_revision":
       return `Purpose: plan revision. The user is editing an existing plan (see activePlanSummary in planning context). When they ask for changes — fewer days, different exercises, shorter sessions, weekday swaps — call revise_workout_plan with the full updated program and a short changeSummary. Do not call propose_workout_plan for revisions. Saved and active plans auto-commit: summarize what changed in plain text and confirm the update is live. The server attaches a compact update card — never replay the full weekly schedule in chat. Only draft plans still need the user to tap Save draft on the original plan card.`;
     case "session_swap":
-      return `Purpose: session swap. Focus on substituting exercises for an active session.`;
+      return `Purpose: session swap. The user is mid-workout and needs a substitute for the current exercise (see sessionContext). Ask one clarifying question only if needed (e.g. injury vs equipment). Then call suggest_exercise_alternatives with 2-4 options that preserve similar muscle focus and match available equipment. Summarize briefly in plain text — the server attaches a swap carousel.`;
     default:
       return `Purpose: ${purpose}.`;
   }
@@ -46,17 +49,30 @@ export function buildCoachInstructions(
 
   const missing = planningContext.missingSlots;
   const missingHint =
-    missing.length > 0
-      ? `Still missing: ${missing.join(", ")}. Ask about only these (one cluster max) or use show_equipment_picker if equipment is missing.`
-      : planningContext.merged.skipRemainingSlots
-        ? "User asked you to choose defaults. State the assumptions you are using."
-        : "Planning context is complete. If the user wants a program, call propose_workout_plan now.";
+    purpose === "session_swap"
+      ? "Focus on the live session exercise swap. Do not propose a full weekly program."
+      : missing.length > 0
+        ? `Still missing: ${missing.join(", ")}. Ask about only these (one cluster max) or use show_equipment_picker if equipment is missing.`
+        : planningContext.merged.skipRemainingSlots
+          ? "User asked you to choose defaults. State the assumptions you are using."
+          : "Planning context is complete. If the user wants a program, call propose_workout_plan now.";
+
+  const threadSummaryBlock = planningContext.threadSummary
+    ? `\nEarlier thread summary (messages before the recent window):\n${planningContext.threadSummary}`
+    : "";
+
+  const trainingHint =
+    planningContext.trainingSummary?.hasHistory &&
+    purpose !== "session_swap"
+      ? "Training history is available in planning context. Use progressiveOverloadHints when suggesting load progression in revisions."
+      : "";
 
   return `${BASE_RULES}
 
 ${purposeRules(purpose)}
 
 ${missingHint}
+${trainingHint}${threadSummaryBlock}
 
 Planning context:
 ${contextJson}`;

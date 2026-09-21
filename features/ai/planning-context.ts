@@ -1,6 +1,11 @@
 import type { ChatThread, ThreadPlanningFacts, User } from "@/db/schema";
 import type { Equipment } from "@/db/schema";
 import type { PlanSummaryForContext } from "@/features/plans/repository";
+import {
+  trainingSummaryForPrompt,
+  type SessionContextForPrompt,
+  type TrainingSummaryForPrompt,
+} from "./training-context";
 
 export type PlanningSlot =
   | "goal"
@@ -25,7 +30,11 @@ export type MergedPlanningFacts = {
 export type PlanningContext = {
   purpose: ChatThread["purpose"];
   relatedPlanId: string | null;
+  relatedSessionId: string | null;
   activePlanSummary: PlanSummaryForContext | null;
+  trainingSummary: TrainingSummaryForPrompt | null;
+  sessionContext: SessionContextForPrompt | null;
+  threadSummary: string | null;
   profile: Pick<
     User,
     | "id"
@@ -139,7 +148,11 @@ export function shouldAllowPropose(context: PlanningContext): boolean {
 export function buildPlanningContext(params: {
   purpose: ChatThread["purpose"];
   relatedPlanId?: string | null;
+  relatedSessionId?: string | null;
   activePlanSummary?: PlanSummaryForContext | null;
+  trainingSummary?: TrainingSummaryForPrompt | null;
+  sessionContext?: SessionContextForPrompt | null;
+  threadSummary?: string | null;
   profile: PlanningContext["profile"];
   equipmentSlugs: string[];
   equipmentCatalog: Equipment[];
@@ -163,7 +176,11 @@ export function buildPlanningContext(params: {
   return {
     purpose: params.purpose,
     relatedPlanId: params.relatedPlanId ?? null,
+    relatedSessionId: params.relatedSessionId ?? null,
     activePlanSummary: params.activePlanSummary ?? null,
+    trainingSummary: params.trainingSummary ?? null,
+    sessionContext: params.sessionContext ?? null,
+    threadSummary: params.threadSummary ?? null,
     profile: params.profile,
     equipmentSlugs: params.equipmentSlugs,
     equipmentCatalog: params.equipmentCatalog,
@@ -202,7 +219,11 @@ export function planningContextForPrompt(context: PlanningContext) {
   return {
     purpose: context.purpose,
     relatedPlanId: context.relatedPlanId,
+    relatedSessionId: context.relatedSessionId,
     activePlanSummary: context.activePlanSummary,
+    trainingSummary: trainingSummaryForPrompt(context.trainingSummary),
+    sessionContext: context.sessionContext,
+    threadSummary: context.threadSummary,
     profile: {
       primaryGoal: context.merged.primaryGoal,
       experienceLevel: context.merged.experienceLevel,
