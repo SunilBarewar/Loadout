@@ -1,4 +1,4 @@
-import type { PlanExercise, WeightUnit } from "@/db";
+import type { PlanExercise, SessionExercise, WeightUnit } from "@/db";
 import type { TodayExercisePreview } from "@/features/sessions/schemas";
 
 export function formatOrderLabel(position: number): string {
@@ -49,6 +49,35 @@ export function formatEquipmentLabel(slugs: Array<string | null>): string | null
   }
 
   return unique.join(", ");
+}
+
+export function mapSessionExercisesToPreviews(
+  exercises: SessionExercise[],
+  weightUnit: WeightUnit
+): TodayExercisePreview[] {
+  return [...exercises]
+    .filter((exercise) => exercise.status !== "replaced")
+    .sort((a, b) => a.position - b.position)
+    .map((exercise) => {
+      const reps =
+        exercise.targetRepsMinSnapshot === exercise.targetRepsMaxSnapshot
+          ? `${exercise.targetRepsMinSnapshot}`
+          : `${exercise.targetRepsMinSnapshot}–${exercise.targetRepsMaxSnapshot}`;
+
+      const unit = exercise.weightUnitSnapshot ?? weightUnit;
+
+      return {
+        position: exercise.position,
+        orderLabel: formatOrderLabel(exercise.position),
+        name: exercise.nameSnapshot,
+        targetLabel: `${exercise.targetSetsSnapshot} sets × ${reps} reps`,
+        loadLabel:
+          exercise.targetLoadSnapshot != null
+            ? `${exercise.targetLoadSnapshot} ${unit} target`
+            : null,
+        restLabel: formatRestLabel(exercise.restSecondsSnapshot),
+      };
+    });
 }
 
 export function mapExercisesToPreviews(

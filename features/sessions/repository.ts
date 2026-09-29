@@ -857,20 +857,23 @@ export async function replaceExercise(params: {
   reason?: string | null;
 }): Promise<{ replacementExerciseId: string } | null> {
   const loaded = await getSessionWithExercises(params.sessionId, params.userId);
-  if (!loaded || loaded.session.status !== "active") {
+  if (
+    !loaded ||
+    !["active", "paused"].includes(loaded.session.status)
+  ) {
     return null;
   }
 
-  const exercise = loaded.exercises.find(
+  let exercise = loaded.exercises.find(
     (item) => item.id === params.sessionExerciseId
   );
+
   if (
-    !exercise ||
-    exercise.status === "completed" ||
-    exercise.status === "skipped" ||
-    exercise.status === "replaced"
+    exercise?.status === "replaced" ||
+    exercise?.status === "completed" ||
+    exercise?.status === "skipped"
   ) {
-    return null;
+    exercise = undefined;
   }
 
   const trimmedName = params.name.trim();
@@ -879,6 +882,29 @@ export async function replaceExercise(params: {
   }
 
   const now = new Date();
+
+  if (!exercise) {
+    const existingReplacement = loaded.exercises.find(
+      (item) =>
+        item.replacesSessionExerciseId === params.sessionExerciseId &&
+        item.status !== "replaced"
+    );
+
+    if (!existingReplacement) {
+      return null;
+    }
+
+    await db
+      .update(sessionExercises)
+      .set({
+        nameSnapshot: trimmedName,
+        replacementReason: params.reason ?? existingReplacement.replacementReason,
+        updatedAt: now,
+      })
+      .where(eq(sessionExercises.id, existingReplacement.id));
+
+    return { replacementExerciseId: existingReplacement.id };
+  }
   const maxPosition = loaded.exercises.reduce(
     (max, item) => Math.max(max, item.position),
     0

@@ -18,6 +18,7 @@ import {
   getCompletedSessionsForWeek,
   getLastCompletedSessionForPlanInRange,
   getSessionForUserToday,
+  getSessionWithExercises,
   getWeeklyVolume,
 } from "@/features/sessions/repository";
 import type { TodayPageData, TodaySessionState } from "@/features/sessions/schemas";
@@ -26,6 +27,7 @@ import {
   formatGoalLabel,
   formatVolume,
   mapExercisesToPreviews,
+  mapSessionExercisesToPreviews,
 } from "./formatters";
 
 function buildSessionState(params: {
@@ -228,6 +230,41 @@ export async function getTodayPageData(user: User): Promise<TodayPageData> {
       ? ((weeklyVolume - previousVolume) / previousVolume) * 100
       : null;
 
+  let workoutExercises = mapExercisesToPreviews(
+    todayPlanDay?.exercises ?? [],
+    user.weightUnit
+  );
+  let workoutTotalSets =
+    todayPlanDay?.exercises.reduce(
+      (total, exercise) => total + exercise.targetSets,
+      0
+    ) ?? 0;
+
+  if (
+    todayPlanDay &&
+    sessionToday &&
+    ["active", "paused", "completed"].includes(sessionToday.status) &&
+    sessionToday.sourcePlanDayId === todayPlanDay.id
+  ) {
+    const liveSession = await getSessionWithExercises(
+      sessionToday.id,
+      user.id
+    );
+    if (liveSession) {
+      const activeSessionExercises = liveSession.exercises.filter(
+        (exercise) => exercise.status !== "replaced"
+      );
+      workoutExercises = mapSessionExercisesToPreviews(
+        liveSession.exercises,
+        user.weightUnit
+      );
+      workoutTotalSets = activeSessionExercises.reduce(
+        (total, exercise) => total + exercise.targetSetsSnapshot,
+        0
+      );
+    }
+  }
+
   const workout =
     todayPlanDay != null
       ? {
@@ -238,15 +275,9 @@ export async function getTodayPageData(user: User): Promise<TodayPageData> {
           dayTitle: todayPlanDay.title,
           focus: todayPlanDay.focus,
           estimatedMinutes: todayPlanDay.estimatedMinutes,
-          exerciseCount: todayPlanDay.exercises.length,
-          totalSets: todayPlanDay.exercises.reduce(
-            (total, exercise) => total + exercise.targetSets,
-            0
-          ),
-          exercises: mapExercisesToPreviews(
-            todayPlanDay.exercises,
-            user.weightUnit
-          ),
+          exerciseCount: workoutExercises.length,
+          totalSets: workoutTotalSets,
+          exercises: workoutExercises,
           equipmentLabel: formatEquipmentLabel(
             todayPlanDay.exercises.map((exercise) => exercise.equipmentSlug)
           ),
